@@ -1,34 +1,25 @@
-name: Deploy SM TPU Stock to GitHub Pages
+name: Deploy web to GitHub Pages
 
 on:
   push:
     branches: ["main"]
+    paths: ["web/**"]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  contents: write
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload web artifact
-        uses: actions/upload-pages-artifact@v3
         with:
-          path: "./web"
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          fetch-depth: 0
+      - name: Push web folder to gh-pages branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git subtree split --prefix web -b gh-pages-tmp
+          git push origin gh-pages-tmp:gh-pages --force
