@@ -1,0 +1,18 @@
+{
+  "name": "SM TPU Inventory — Branch 1 & 2",
+  "short_name": "SM TPU",
+  "description": "Mobile TPU cover inventory, daily sales, stock-in, and branch transfer app with Google Sheets sync.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f766e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
