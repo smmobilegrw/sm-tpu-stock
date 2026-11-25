@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>SM TPU Stock — Branch 1 &amp; 2</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- Top Header -->
+    <header class="topbar no-print">
+      <div class="topbar-left">
+        <div class="brand-mark">SM</div>
+        <div>
+          <h1 class="app-title">SM TPU Stock</h1>
+          <button id="branchSwitchBtn" class="branch-badge" type="button" title="Switch Branch / User">
+            <span id="activeBranchLabel">SM Branch 1</span>
+            <span class="dot-sep">&bull;</span>
+            <span id="activeUserLabel">Owner</span>
+          </button>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="syncBadge" class="sync-badge local">Local</span>
+        <button id="syncNowBtn" class="icon-btn" type="button" title="Sync with Google Sheets">&#8635;</button>
+      </div>
+    </header>
+
+    <!-- Main View Container -->
+    <main class="main-content">
+      <!-- TAB 1: STOCK / SELL -->
+      <section id="view-stock" class="tab-view active">
+        <div class="search-sticky no-print">
+          <div class="search-box">
+            <span class="search-icon">&#128269;</span>
+            <input id="stockSearchInput" type="search" placeholder="Model search karein (e.g. A05, Y20, Hot 50, 14 PM)..." autocomplete="off" />
+            <button id="clearSearchBtn" class="clear-btn hidden" type="button">&times;</button>
+          </div>
+
+          <div id="brandPills" class="pill-scroll"></div>
+
+          <div class="filter-row">
+            <div class="chip-group" id="stockStatusFilters">
+              <button class="chip active" data-filter="all" type="button">All</button>
+              <button class="chip" data-filter="instock" type="button">In Stock</button>
+              <button class="chip" data-filter="low" type="button">Low (1-2)</button>
+              <button class="chip" data-filter="zero" type="button">Out (0)</button>
+              <button class="chip" data-filter="other" type="button">At Other Branch</button>
+            </div>
+          </div>
+
+          <div class="mini-stats" id="stockMiniStats"></div>
+        </div>
+
+        <div id="stockList" class="card-list"></div>
+      </section>
+
+      <!-- TAB 2: NAYA MAAL (STOCK IN) -->
+      <section id="view-stock-in" class="tab-view">
+        <div class="panel-card">
+          <div class="panel-header-row">
+            <div>
+              <h2>Naya Maal Entry (Stock In)</h2>
+              <p class="muted">Aaye hue models select karein aur ek sath save karein</p>
+            </div>
+            <button id="openAddModelBtn" class="btn btn-outline btn-sm" type="button">+ New Model</button>
+          </div>
+
+          <div class="form-row-2">
+            <label class="field">
+              <span>Kis Branch Mein Add Karna Hai?</span>
+              <select id="stockInBranchSelect">
+                <option value="SM Branch 1">SM Branch 1</option>
+                <option value="SM Branch 2">SM Branch 2</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Note / Supplier (Optional)</span>
+              <input id="stockInNoteInput" type="text" placeholder="e.g. Lahore Lot / Hall Road" />
+            </label>
+          </div>
+
+          <div class="search-box mt-8">
+            <span class="search-icon">&#128269;</span>
+            <input id="stockInSearchInput" type="search" placeholder="Add karne ke liye model search karein..." autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Batch Cart -->
+        <div id="stockInCartCard" class="panel-card cart-card hidden">
+          <div class="panel-header-row">
+            <h3>Batch Cart (<span id="cartItemCount">0</span> models, <span id="cartTotalPcs">0</span> pcs)</h3>
+            <button id="clearCartBtn" class="btn btn-text btn-sm" type="button">Clear</button>
+          </div>
+          <div id="stockInCartList" class="cart-list"></div>
+          <button id="confirmStockInBtn" class="btn btn-primary btn-block mt-12" type="button">
+            Confirm &amp; Add All to Sheet
+          </button>
+        </div>
+
+        <div id="stockInPickerList" class="card-list"></div>
+      </section>
+
+      <!-- TAB 3: TRANSFERS (BRANCH 1 <-> BRANCH 2) -->
+      <section id="view-transfer" class="tab-view">
+        <div class="panel-card">
+          <h2>Branch Transfer (Branch 1 &#8644; Branch 2)</h2>
+          <p class="muted">Jab ek branch par cover khatam ho to doosri branch se transfer karein (is se Daily Sale kharab nahi hogi).</p>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header-row">
+            <h3>Meri Branch Mein Zero, Doosri Mein Available</h3>
+            <span id="availableOtherCount" class="count-pill">0</span>
+          </div>
+          <div id="crossBranchNeededList" class="card-list compact"></div>
+        </div>
+
+        <div class="panel-card">
+          <h3>Recent Transfers</h3>
+          <div id="transferHistoryList" class="log-list"></div>
+        </div>
+      </section>
+
+      <!-- TAB 4: DAILY REPORTS & PRINT -->
+      <section id="view-reports" class="tab-view">
+        <div class="panel-card no-print">
+          <div class="panel-header-row">
+            <h2>Daily Sheet &amp; Reports</h2>
+            <div class="btn-group">
+              <button id="copyOrderListBtn" class="btn btn-outline btn-sm" type="button">Copy Order List</button>
+              <button id="printSheetBtn" class="btn btn-primary btn-sm" type="button">Print Stock</button>
+            </div>
+          </div>
+
+          <div class="form-row-2 mt-8">
+            <label class="field">
+              <span>Date Select Karein</span>
+              <input id="reportDateInput" type="date" />
+            </label>
+            <label class="field">
+              <span>Branch Filter</span>
+              <select id="reportBranchFilter">
+                <option value="ALL">Dono Branches</option>
+                <option value="SM Branch 1">SM Branch 1</option>
+                <option value="SM Branch 2">SM Branch 2</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="reportSummaryCards" class="kpi-grid mt-12"></div>
+
+          <div class="subtabs mt-12">
+            <button class="subtab active" data-report-tab="sales" type="button">Sales Sheet</button>
+            <button class="subtab" data-report-tab="stockin" type="button">Stock-In Sheet</button>
+            <button class="subtab" data-report-tab="transfers" type="button">Transfers</button>
+            <button class="subtab" data-report-tab="order" type="button">Order List (0 / Low)</button>
+          </div>
+        </div>
+
+        <div id="reportTabContent" class="panel-card no-print"></div>
+
+        <!-- Printable View (Visible in Print Mode) -->
+        <div id="printableArea" class="print-only"></div>
+      </section>
+
+      <!-- TAB 5: SETTINGS & GOOGLE SHEETS SYNC -->
+      <section id="view-settings" class="tab-view">
+        <div class="panel-card">
+          <h2>User &amp; Branch Profile</h2>
+          <div class="form-row-2 mt-8">
+            <label class="field">
+              <span>Active Branch</span>
+              <select id="settingsBranchSelect">
+                <option value="SM Branch 1">SM Branch 1</option>
+                <option value="SM Branch 2">SM Branch 2</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>User Name (e.g. Owner / Bhai)</span>
+              <input id="settingsUserInput" type="text" placeholder="Owner" />
+            </label>
+          </div>
+          <label class="toggle-row mt-12">
+            <input id="settingsLockOtherBranch" type="checkbox" checked />
+            <span>Doosri branch ki direct sale lock rakhein (sirf View + Transfer allow ho)</span>
+          </label>
+          <button id="saveProfileBtn" class="btn btn-primary mt-12" type="button">Save Profile</button>
+        </div>
+
+        <div class="panel-card">
+          <h2>Google Sheets + Gmail Sync</h2>
+          <p class="muted">Apni Google Sheet ka Apps Script Web App URL yahan paste karein taake har entry live save aur daily backup ho.</p>
+          <label class="field mt-8">
+            <span>Apps Script Web App URL</span>
+            <input id="settingsApiUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+          </label>
+          <div class="btn-grid mt-12">
+            <button id="saveApiUrlBtn" class="btn btn-primary" type="button">Save &amp; Test URL</button>
+            <button id="pushSeedBtn" class="btn btn-outline" type="button">Push Stock to Sheet</button>
+            <button id="pullSyncBtn" class="btn btn-outline" type="button">Sync from Sheet</button>
+            <button id="runBackupBtn" class="btn btn-outline" type="button">Run Drive Backup Now</button>
+          </div>
+          <div id="apiStatusMessage" class="status-box mt-8 hidden"></div>
+        </div>
+
+        <div class="panel-card">
+          <h2>Local Backup &amp; Export</h2>
+          <div class="btn-grid mt-8">
+            <button id="exportCsvBtn" class="btn btn-outline" type="button">Download Stock CSV</button>
+            <button id="exportJsonBtn" class="btn btn-outline" type="button">Download Full Backup JSON</button>
+            <button id="resetDemoBtn" class="btn btn-danger-outline" type="button">Reset Local Demo Data</button>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <h3>Google Sheet Connect Karne ka Asaan Tareeqa</h3>
+          <ol class="guide-list">
+            <li>Apne Gmail se Google Sheets mein nayi sheet banayein (naam: <strong>SM TPU Inventory</strong>).</li>
+            <li>Menu mein <strong>Extensions &rarr; Apps Script</strong> kholein.</li>
+            <li>Project folder mein di gayi <code>google-apps-script/Code.gs</code> file ka code wahan paste karke Save karein.</li>
+            <li>Apps Script mein <strong>Deploy &rarr; New deployment &rarr; Web app</strong> select karein (<em>Execute as: Me</em>, <em>Who has access: Anyone</em>).</li>
+            <li>Jo URL mile usay upar paste karein aur <strong>Save &amp; Test URL</strong> dabayein.</li>
+            <li>Phir <strong>Push Stock to Sheet</strong> dabayein — saare 284 models aapki Google Sheet mein chale jayenge!</li>
+            <li>Google Sheet reload karke menu <strong>SM TPU App &rarr; 2. Enable Daily Auto-Backup</strong> par click kar dein.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav no-print">
+      <button class="nav-item active" data-tab="stock" type="button">
+        <span class="nav-icon">&#128241;</span>
+        <span>Stock</span>
+      </button>
+      <button class="nav-item" data-tab="stock-in" type="button">
+        <span class="nav-icon">&#10133;</span>
+        <span>Naya Maal</span>
+      </button>
+      <button class="nav-item" data-tab="transfer" type="button">
+        <span class="nav-icon">&#8644;</span>
+        <span>Transfer</span>
+      </button>
+      <button class="nav-item" data-tab="reports" type="button">
+        <span class="nav-icon">&#128202;</span>
+        <span>Reports</span>
+      </button>
+      <button class="nav-item" data-tab="settings" type="button">
+        <span class="nav-icon">&#9881;</span>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Branch Onboarding / Switch Modal -->
+  <div id="branchModal" class="modal-backdrop hidden no-print">
+    <div class="modal-card">
+      <h2>Apni Branch Select Karein</h2>
+      <p class="muted">Har mobile par apni branch select karein. Aap dono branches ka stock dekh sakte hain, lekin sale sirf apni branch se hogi.</p>
+      <div class="branch-cards mt-12">
+        <button class="branch-choice" data-branch="SM Branch 1" type="button">
+          <strong>SM Branch 1</strong>
+          <span>Main Shop (Existing Stock)</span>
+        </button>
+        <button class="branch-choice" data-branch="SM Branch 2" type="button">
+          <strong>SM Branch 2</strong>
+          <span>Second Shop (Bhai)</span>
+        </button>
+      </div>
+      <label class="field mt-12">
+        <span>Aapka Naam (User)</span>
+        <input id="modalUserInput" type="text" placeholder="e.g. Owner ya Bhai" />
+      </label>
+      <button id="closeBranchModalBtn" class="btn btn-text btn-block mt-8" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Sell / Transfer Action Modal -->
+  <div id="itemActionModal" class="modal-backdrop hidden no-print">
+    <div class="modal-card">
+      <div class="panel-header-row">
+        <div>
+          <span id="modalBrandBadge" class="brand-tag">Samsung</span>
+          <h2 id="modalModelTitle" class="mt-4">A05</h2>
+        </div>
+        <button id="closeItemModalBtn" class="icon-btn" type="button">&times;</button>
+      </div>
+
+      <div class="branch-stock-strip mt-12">
+        <div class="bs-box">
+          <small>SM Branch 1</small>
+          <strong id="modalB1Qty">0</strong>
+        </div>
+        <div class="bs-box">
+          <small>SM Branch 2</small>
+          <strong id="modalB2Qty">0</strong>
+        </div>
+      </div>
+
+      <div class="modal-tabs mt-12">
+        <button class="subtab active" data-modal-mode="sell" type="button">Sell Cover</button>
+        <button class="subtab" data-modal-mode="transfer" type="button">Transfer Branch</button>
+      </div>
+
+      <div id="modalSellSection" class="mt-12">
+        <label class="field">
+          <span>Sell Branch</span>
+          <select id="modalSellBranch"></select>
+        </label>
+        <label class="field mt-8">
+          <span>Kitne Pcs Sell Hue?</span>
+          <div class="qty-stepper">
+            <button id="sellQtyMinus" type="button">-</button>
+            <input id="sellQtyInput" type="number" min="1" value="1" />
+            <button id="sellQtyPlus" type="button">+</button>
+          </div>
+        </label>
+        <label class="field mt-8">
+          <span>Note (Optional)</span>
+          <input id="sellNoteInput" type="text" placeholder="Optional note..." />
+        </label>
+        <button id="confirmSellBtn" class="btn btn-primary btn-block mt-12" type="button">Confirm Sell</button>
+      </div>
+
+      <div id="modalTransferSection" class="mt-12 hidden">
+        <label class="field">
+          <span>Transfer Direction</span>
+          <select id="modalTransferDir">
+            <option value="2to1">SM Branch 2 &rarr; SM Branch 1 (Mangwao)</option>
+            <option value="1to2">SM Branch 1 &rarr; SM Branch 2 (Bhejo)</option>
+          </select>
+        </label>
+        <label class="field mt-8">
+          <span>Kitne Pcs Transfer Karne Hain?</span>
+          <div class="qty-stepper">
+            <button id="trQtyMinus" type="button">-</button>
+            <input id="trQtyInput" type="number" min="1" value="1" />
+            <button id="trQtyPlus" type="button">+</button>
+          </div>
+        </label>
+        <button id="confirmTransferBtn" class="btn btn-purple btn-block mt-12" type="button">Confirm Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add New Model Modal -->
+  <div id="addModelModal" class="modal-backdrop hidden no-print">
+    <div class="modal-card">
+      <div class="panel-header-row">
+        <h2>Naya Model Add Karein</h2>
+        <button id="closeAddModelBtn" class="icon-btn" type="button">&times;</button>
+      </div>
+      <label class="field mt-8">
+        <span>Company (Brand)</span>
+        <input id="newModelBrandInput" list="brandDataList" placeholder="e.g. Samsung, Vivo, Tecno..." />
+        <datalist id="brandDataList"></datalist>
+      </label>
+      <label class="field mt-8">
+        <span>Model Name</span>
+        <input id="newModelNameInput" type="text" placeholder="e.g. A56 5G" />
+      </label>
+      <div class="form-row-2 mt-8">
+        <label class="field">
+          <span>SM Branch 1 Qty</span>
+          <input id="newModelB1Input" type="number" min="0" value="0" />
+        </label>
+        <label class="field">
+          <span>SM Branch 2 Qty</span>
+          <input id="newModelB2Input" type="number" min="0" value="0" />
+        </label>
+      </div>
+      <button id="confirmAddModelBtn" class="btn btn-primary btn-block mt-12" type="button">Add Model</button>
+    </div>
+  </div>
+
+  <!-- Toast with Undo -->
+  <div id="toast" class="toast hidden no-print">
+    <span id="toastMsg"></span>
+    <button id="toastUndoBtn" class="toast-undo hidden" type="button">Undo</button>
+  </div>
+
+  <script src="./initial-data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
