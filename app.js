@@ -44,6 +44,7 @@
       sales: [],
       stockIn: [],
       transfers: [],
+      adjustments: [],
       pendingQueue: [],
     };
   }
@@ -54,6 +55,7 @@
     search: '',
     brand: 'ALL',
     statusFilter: 'all',
+    auditMode: false,
     stockInSearch: '',
     cart: {}, // key -> { id, brand, model, qty }
     reportDate: todayStr(),
@@ -337,6 +339,55 @@
     return true;
   }
 
+  function adjustStock(itemId, newQty, branch = state.activeBranch, reason = 'Physical count / Audit') {
+    const item = state.stock.find((x) => x.id === itemId);
+    if (!item) return false;
+    if (state.lockOtherBranch && branch !== state.activeBranch) {
+      showToast(`${branch} lock hai — apni branch ki ginti update karein.`);
+      return false;
+    }
+    const cleanQty = Math.max(0, Number(newQty) || 0);
+    const oldQty = getQty(item, branch);
+    if (cleanQty === oldQty) {
+      showToast(`${item.brand} ${item.model} pehle se ${cleanQty} pcs hai.`);
+      return true;
+    }
+
+    setQty(item, branch, cleanQty);
+    const txId = makeTxId('AD');
+    if (!Array.isArray(state.adjustments)) state.adjustments = [];
+    state.adjustments.unshift({
+      id: txId,
+      date: todayStr(),
+      time: nowTimeStr(),
+      branch,
+      user: state.userName,
+      brand: item.brand,
+      model: item.model,
+      oldQty,
+      newQty: cleanQty,
+      diff: cleanQty - oldQty,
+      reason,
+    });
+    saveState();
+    renderAll();
+
+    queueOrSync({
+      action: 'adjust_stock',
+      clientTxId: txId,
+      branch,
+      user: state.userName,
+      brand: item.brand,
+      model: item.model,
+      newQty: cleanQty,
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+
+    showToast(`Fixed ${item.brand} ${item.model}: ${oldQty} → ${cleanQty} pcs (${branch})`);
+    return true;
+  }
+
   function submitStockInBatch() {
     const entries = Object.values(ui.cart).filter((x) => Number(x.qty) > 0);
     if (entries.length === 0) {
@@ -515,8 +566,26 @@
             ? `<button class="quick-pull-btn" data-action="pull" data-id="${escapeHtml(item.id)}" type="button">Mangwao</button>`
             : '';
 
+        const actionsHtml = ui.auditMode
+          ? `
+            <div class="audit-controls">
+              <button class="audit-step-btn" data-audit-step="-1" data-id="${escapeHtml(item.id)}" type="button">-</button>
+              <input class="audit-input" data-audit-input="${escapeHtml(item.id)}" type="number" min="0" value="${myQty}" />
+              <button class="audit-step-btn" data-audit-step="1" data-id="${escapeHtml(item.id)}" type="button">+</button>
+              <button class="audit-zero-btn" data-audit-zero="${escapeHtml(item.id)}" type="button">0</button>
+              <button class="audit-save-btn" data-audit-save="${escapeHtml(item.id)}" type="button">Save</button>
+            </div>
+          `
+          : `
+            <div class="card-actions">
+              ${pullBtn}
+              <button class="quick-sell-btn" data-action="sell1" data-id="${escapeHtml(item.id)}" type="button" ${myQty <= 0 ? 'disabled' : ''}>-1 Sell</button>
+              <button class="more-btn" data-action="open" data-id="${escapeHtml(item.id)}" type="button">...</button>
+            </div>
+          `;
+
         return `
-          <div class="stock-card">
+          <div class="stock-card ${ui.auditMode ? 'audit-card' : ''}">
             <div class="stock-info">
               <span class="brand-tag">${escapeHtml(item.brand)}</span>
               <div class="model-name">${escapeHtml(item.model)}</div>
@@ -525,11 +594,7 @@
                 <span class="other-pill ${otherQty > 0 ? 'has-stock' : ''}">${otherShort}: ${otherQty}</span>
               </div>
             </div>
-            <div class="card-actions">
-              ${pullBtn}
-              <button class="quick-sell-btn" data-action="sell1" data-id="${escapeHtml(item.id)}" type="button" ${myQty <= 0 ? 'disabled' : ''}>-1 Sell</button>
-              <button class="more-btn" data-action="open" data-id="${escapeHtml(item.id)}" type="button">...</button>
-            </div>
+            ${actionsHtml}
           </div>
         `;
       })
@@ -802,6 +867,10 @@
       ? `<option value="${state.activeBranch}">${state.activeBranch}</option>`
       : `<option value="${BRANCH_1}">${BRANCH_1}</option><option value="${BRANCH_2}">${BRANCH_2}</option>`;
     els.modalSellBranch.value = state.activeBranch;
+    els.modalAuditBranch.innerHTML = els.modalSellBranch.innerHTML;
+    els.modalAuditBranch.value = state.activeBranch;
+    els.auditQtyInput.value = String(getQty(item, state.activeBranch));
+    els.auditReasonInput.value = '';
     els.sellQtyInput.value = '1';
     els.sellNoteInput.value = '';
     els.trQtyInput.value = '1';
@@ -818,6 +887,7 @@
     });
     els.modalSellSection.classList.toggle('hidden', mode !== 'sell');
     els.modalTransferSection.classList.toggle('hidden', mode !== 'transfer');
+    els.modalAuditSection.classList.toggle('hidden', mode !== 'audit');
   }
 
   function switchTab(tab) {
@@ -841,7 +911,7 @@
   function cacheDom() {
     [
       'branchSwitchBtn', 'activeBranchLabel', 'activeUserLabel', 'syncBadge', 'syncNowBtn',
-      'stockSearchInput', 'clearSearchBtn', 'brandPills', 'stockStatusFilters', 'stockMiniStats', 'stockList',
+      'stockSearchInput', 'clearSearchBtn', 'brandPills', 'stockStatusFilters', 'auditModeBtn', 'auditBanner', 'stockMiniStats', 'stockList',
       'openAddModelBtn', 'stockInBranchSelect', 'stockInNoteInput', 'stockInSearchInput',
       'stockInCartCard', 'cartItemCount', 'cartTotalPcs', 'clearCartBtn', 'stockInCartList', 'confirmStockInBtn', 'stockInPickerList',
       'availableOtherCount', 'crossBranchNeededList', 'transferHistoryList',
@@ -853,6 +923,7 @@
       'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty', 'modalB2Qty',
       'closeItemModalBtn', 'modalSellBranch', 'sellQtyMinus', 'sellQtyInput', 'sellQtyPlus', 'sellNoteInput', 'confirmSellBtn',
       'modalSellSection', 'modalTransferSection', 'modalTransferDir', 'trQtyMinus', 'trQtyInput', 'trQtyPlus', 'confirmTransferBtn',
+      'modalAuditSection', 'modalAuditBranch', 'auditQtyMinus', 'auditQtyInput', 'auditQtyPlus', 'auditZeroBtn', 'auditReasonInput', 'confirmAuditBtn',
       'addModelModal', 'closeAddModelBtn', 'newModelBrandInput', 'brandDataList', 'newModelNameInput', 'newModelB1Input', 'newModelB2Input', 'confirmAddModelBtn',
       'toast', 'toastMsg', 'toastUndoBtn',
     ].forEach((id) => {
@@ -891,13 +962,47 @@
       const chip = e.target.closest('[data-filter]');
       if (!chip) return;
       ui.statusFilter = chip.dataset.filter;
-      document.querySelectorAll('#stockStatusFilters .chip').forEach((c) => c.classList.remove('active'));
+      document.querySelectorAll('#stockStatusFilters [data-filter]').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
+      renderStockList();
+    });
+
+    els.auditModeBtn.addEventListener('click', () => {
+      ui.auditMode = !ui.auditMode;
+      els.auditModeBtn.classList.toggle('active', ui.auditMode);
+      els.auditBanner.classList.toggle('hidden', !ui.auditMode);
       renderStockList();
     });
 
     // Stock list actions
     els.stockList.addEventListener('click', (e) => {
+      const stepBtn = e.target.closest('[data-audit-step]');
+      if (stepBtn) {
+        const id = stepBtn.dataset.id;
+        const delta = Number(stepBtn.dataset.auditStep) || 0;
+        const inp = els.stockList.querySelector(`[data-audit-input="${CSS.escape(id)}"]`);
+        if (inp) inp.value = String(Math.max(0, (Number(inp.value) || 0) + delta));
+        return;
+      }
+
+      const zeroBtn = e.target.closest('[data-audit-zero]');
+      if (zeroBtn) {
+        const id = zeroBtn.dataset.auditZero;
+        const inp = els.stockList.querySelector(`[data-audit-input="${CSS.escape(id)}"]`);
+        if (inp) inp.value = '0';
+        adjustStock(id, 0, state.activeBranch, 'Shelf audit (set 0)');
+        return;
+      }
+
+      const saveBtn = e.target.closest('[data-audit-save]');
+      if (saveBtn) {
+        const id = saveBtn.dataset.auditSave;
+        const inp = els.stockList.querySelector(`[data-audit-input="${CSS.escape(id)}"]`);
+        const val = Math.max(0, Number(inp ? inp.value : 0) || 0);
+        adjustStock(id, val, state.activeBranch, 'Shelf audit');
+        return;
+      }
+
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const id = btn.dataset.id;
@@ -1060,6 +1165,27 @@
       const from = dir === '2to1' ? BRANCH_2 : BRANCH_1;
       const to = dir === '2to1' ? BRANCH_1 : BRANCH_2;
       const ok = transferItem(ui.modalItemId, from, to, qty, 'Modal transfer');
+      if (ok) els.itemActionModal.classList.add('hidden');
+    });
+
+    els.auditQtyMinus.addEventListener('click', () => {
+      els.auditQtyInput.value = String(Math.max(0, (Number(els.auditQtyInput.value) || 0) - 1));
+    });
+    els.auditQtyPlus.addEventListener('click', () => {
+      els.auditQtyInput.value = String((Number(els.auditQtyInput.value) || 0) + 1);
+    });
+    els.auditZeroBtn.addEventListener('click', () => {
+      els.auditQtyInput.value = '0';
+    });
+    els.modalAuditBranch.addEventListener('change', () => {
+      const item = state.stock.find((x) => x.id === ui.modalItemId);
+      if (item) els.auditQtyInput.value = String(getQty(item, els.modalAuditBranch.value));
+    });
+    els.confirmAuditBtn.addEventListener('click', () => {
+      const qty = Math.max(0, Number(els.auditQtyInput.value) || 0);
+      const branch = els.modalAuditBranch.value;
+      const reason = els.auditReasonInput.value.trim() || 'Physical count / Audit';
+      const ok = adjustStock(ui.modalItemId, qty, branch, reason);
       if (ok) els.itemActionModal.classList.add('hidden');
     });
 
