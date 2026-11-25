@@ -466,9 +466,79 @@ body {
 
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-purple { background: var(--purple); color: #fff; }
+.btn-amber { background: var(--amber); color: #fff; }
 .btn-outline { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
 .btn-danger-outline { background: #fff; color: var(--red); border: 1.5px solid #fecaca; }
 .btn-text { background: transparent; color: var(--muted); }
+
+/* Audit Mode */
+.audit-chip {
+  border-color: #f59e0b;
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+.audit-chip.active {
+  background: var(--amber);
+  color: #fff;
+  border-color: var(--amber);
+}
+.audit-banner {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--amber-soft);
+  color: #78350f;
+  font-size: 12px;
+}
+.audit-card {
+  flex-wrap: wrap;
+}
+.audit-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.audit-step-btn {
+  width: 30px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+.audit-input {
+  width: 48px;
+  height: 32px;
+  text-align: center;
+  border: 1.5px solid var(--amber);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.audit-zero-btn {
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.audit-save-btn {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: none;
+  background: var(--amber);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
 
 .btn-group {
   display: flex;

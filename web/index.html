@@ -50,7 +50,12 @@
               <button class="chip" data-filter="low" type="button">Low (1-2)</button>
               <button class="chip" data-filter="zero" type="button">Out (0)</button>
               <button class="chip" data-filter="other" type="button">At Other Branch</button>
+              <button id="auditModeBtn" class="chip audit-chip" type="button">Fix Qty (Audit)</button>
             </div>
+          </div>
+
+          <div id="auditBanner" class="audit-banner hidden">
+            <strong>Audit Mode ON:</strong> Shelf check karke seedha actual number likhein aur <em>Save</em> dabayein (Sales report kharab nahi hogi).
           </div>
 
           <div class="mini-stats" id="stockMiniStats"></div>
@@ -305,6 +310,7 @@
       <div class="modal-tabs mt-12">
         <button class="subtab active" data-modal-mode="sell" type="button">Sell Cover</button>
         <button class="subtab" data-modal-mode="transfer" type="button">Transfer Branch</button>
+        <button class="subtab" data-modal-mode="audit" type="button">Fix Qty (Audit)</button>
       </div>
 
       <div id="modalSellSection" class="mt-12">
@@ -344,6 +350,27 @@
           </div>
         </label>
         <button id="confirmTransferBtn" class="btn btn-purple btn-block mt-12" type="button">Confirm Transfer</button>
+      </div>
+
+      <div id="modalAuditSection" class="mt-12 hidden">
+        <label class="field">
+          <span>Branch</span>
+          <select id="modalAuditBranch"></select>
+        </label>
+        <label class="field mt-8">
+          <span>Actual Ginti (Exact Pcs Kitne Hain?)</span>
+          <div class="qty-stepper">
+            <button id="auditQtyMinus" type="button">-</button>
+            <input id="auditQtyInput" type="number" min="0" value="0" />
+            <button id="auditQtyPlus" type="button">+</button>
+            <button id="auditZeroBtn" class="btn btn-danger-outline btn-sm" type="button">0</button>
+          </div>
+        </label>
+        <label class="field mt-8">
+          <span>Reason (Optional)</span>
+          <input id="auditReasonInput" type="text" placeholder="e.g. Shop physical count" />
+        </label>
+        <button id="confirmAuditBtn" class="btn btn-amber btn-block mt-12" type="button">Save Exact Qty</button>
       </div>
     </div>
   </div>

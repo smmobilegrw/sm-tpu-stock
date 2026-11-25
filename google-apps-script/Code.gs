@@ -11,6 +11,7 @@ const CONFIG = {
     SALES: 'Daily_Sales',
     STOCK_IN: 'Stock_In',
     TRANSFERS: 'Transfers',
+    ADJUSTMENTS: 'Stock_Adjustments',
     PRINT: 'Print_View',
   },
   BACKUP_FOLDER: 'SM_TPU_Daily_Backups',
@@ -80,6 +81,20 @@ function setupWorkbook() {
     'Requested_By',
     'Note',
   ], '#6d28d9');
+
+  ensureSheet_(ss, CONFIG.SHEETS.ADJUSTMENTS, [
+    'Entry_ID',
+    'Date',
+    'Time',
+    'Branch',
+    'User',
+    'Brand',
+    'Model',
+    'Old_Qty',
+    'New_Qty',
+    'Diff',
+    'Reason',
+  ], '#b45309');
 
   ensureSheet_(ss, CONFIG.SHEETS.PRINT, ['SM TPU Stock — Printable Sheet'], '#1e293b');
   refreshPrintView();
@@ -201,6 +216,9 @@ function doPost(e) {
         break;
       case 'transfer':
         result = handleTransfer_(payload);
+        break;
+      case 'adjust_stock':
+        result = handleAdjustStock_(payload);
         break;
       case 'add_model':
         result = handleAddModel_(payload);
@@ -488,6 +506,63 @@ function handleTransfer_(payload) {
     entryId: entryId,
     fromNewQty: fromQty - qty,
     toNewQty: toQty + qty,
+  };
+}
+
+function handleAdjustStock_(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const stockSheet = ensureSheet_(ss, CONFIG.SHEETS.STOCK);
+  const adjSheet = ensureSheet_(ss, CONFIG.SHEETS.ADJUSTMENTS, [
+    'Entry_ID',
+    'Date',
+    'Time',
+    'Branch',
+    'User',
+    'Brand',
+    'Model',
+    'Old_Qty',
+    'New_Qty',
+    'Diff',
+    'Reason',
+  ], '#b45309');
+
+  const branch = payload.branch;
+  const branchCol = branchColIndex_(branch);
+  const entryId = payload.clientTxId || Utilities.getUuid();
+  if (hasDuplicateEntryId_(adjSheet, entryId)) {
+    return { ok: true, deduplicated: true, entryId: entryId };
+  }
+
+  const newQty = Math.max(0, Number(payload.newQty) || 0);
+  const key = String(payload.brand || '').trim().toLowerCase() + '::' + String(payload.model || '').trim().toLowerCase();
+  const index = loadStockIndex_(stockSheet);
+  const item = index.get(key);
+  if (!item) throw new Error('Model not found: ' + payload.brand + ' ' + payload.model);
+
+  const oldQty = branchCol === 3 ? item.branch1 : item.branch2;
+  const dt = getDateTimeParts_(payload.timestamp);
+  stockSheet.getRange(item.rowNum, branchCol).setValue(newQty);
+  stockSheet.getRange(item.rowNum, 7).setValue(dt.date);
+
+  adjSheet.appendRow([
+    entryId,
+    dt.date,
+    dt.time,
+    branch,
+    payload.user || branch,
+    item.brand,
+    item.model,
+    oldQty,
+    newQty,
+    newQty - oldQty,
+    payload.reason || 'Physical count / Audit',
+  ]);
+
+  return {
+    ok: true,
+    entryId: entryId,
+    oldQty: oldQty,
+    newQty: newQty,
   };
 }
 
