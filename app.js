@@ -646,17 +646,24 @@
       .map((item) => {
         const cur = getQty(item, targetBranch);
         const inCart = ui.cart[item.id];
+        const inCartBadge = inCart
+          ? `<span class="qty-pill ok">Cart: +${inCart.qty}</span>`
+          : '';
         return `
-        <div class="stock-card">
+        <div class="stock-card stockin-card">
           <div class="stock-info">
             <span class="brand-tag">${escapeHtml(item.brand)}</span>
             <div class="model-name">${escapeHtml(item.model)}</div>
-            <div class="branch-compare"><span class="other-pill">${targetBranch}: ${cur} pcs</span></div>
+            <div class="branch-compare">
+              <span class="other-pill">${targetBranch}: ${cur} pcs</span>
+              ${inCartBadge}
+            </div>
           </div>
-          <div class="card-actions">
+          <div class="stockin-actions">
             <button class="btn btn-outline btn-sm" data-add-cart="${escapeHtml(item.id)}" data-qty="1" type="button">+1</button>
             <button class="btn btn-outline btn-sm" data-add-cart="${escapeHtml(item.id)}" data-qty="5" type="button">+5</button>
-            <button class="btn btn-primary btn-sm" data-add-cart="${escapeHtml(item.id)}" data-qty="10" type="button">${inCart ? `In Cart (${inCart.qty})` : '+10'}</button>
+            <input class="custom-qty-input" data-custom-qty="${escapeHtml(item.id)}" type="number" min="1" placeholder="Qty" />
+            <button class="btn btn-primary btn-sm" data-add-custom="${escapeHtml(item.id)}" type="button">Add</button>
           </div>
         </div>
       `;
@@ -1024,6 +1031,25 @@
     });
 
     els.stockInPickerList.addEventListener('click', (e) => {
+      const customBtn = e.target.closest('[data-add-custom]');
+      if (customBtn) {
+        const id = customBtn.dataset.addCustom;
+        const inp = els.stockInPickerList.querySelector(`[data-custom-qty="${CSS.escape(id)}"]`);
+        const addQty = Number(inp ? inp.value : 0);
+        if (!addQty || addQty <= 0) {
+          showToast('Pehle quantity likhein (maslan 4 ya 15).');
+          if (inp) inp.focus();
+          return;
+        }
+        const item = state.stock.find((x) => x.id === id);
+        if (!item) return;
+        if (!ui.cart[id]) ui.cart[id] = { id: item.id, brand: item.brand, model: item.model, qty: 0 };
+        ui.cart[id].qty += addQty;
+        renderStockInTab();
+        showToast(`Cart mein +${addQty} ${item.brand} ${item.model} add ho gaye`);
+        return;
+      }
+
       const btn = e.target.closest('[data-add-cart]');
       if (!btn) return;
       const id = btn.dataset.addCart;
@@ -1033,6 +1059,14 @@
       if (!ui.cart[id]) ui.cart[id] = { id: item.id, brand: item.brand, model: item.model, qty: 0 };
       ui.cart[id].qty += addQty;
       renderStockInTab();
+    });
+
+    els.stockInPickerList.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !e.target.dataset.customQty) return;
+      e.preventDefault();
+      const id = e.target.dataset.customQty;
+      const addBtn = els.stockInPickerList.querySelector(`[data-add-custom="${CSS.escape(id)}"]`);
+      if (addBtn) addBtn.click();
     });
 
     els.stockInCartList.addEventListener('input', (e) => {

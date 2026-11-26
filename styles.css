@@ -540,6 +540,26 @@ body {
   cursor: pointer;
 }
 
+.stockin-card {
+  flex-wrap: wrap;
+}
+.stockin-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.custom-qty-input {
+  width: 58px;
+  height: 32px;
+  padding: 0 6px;
+  text-align: center;
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .btn-group {
   display: flex;
   gap: 6px;
