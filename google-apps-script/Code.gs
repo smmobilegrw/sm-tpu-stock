@@ -114,7 +114,22 @@ function ensureSheet_(ss, name, headers, headerColor) {
     range.setFontColor('#ffffff');
     sheet.setFrozenRows(1);
   }
+  if (name === CONFIG.SHEETS.STOCK) {
+    sheet.getRange('B:B').setNumberFormat('@');
+  }
   return sheet;
+}
+
+function normalizeModelCell_(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    // Google Sheets converts "12PM" into Sat Dec 30 1899 12:00:00
+    const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || 'Asia/Karachi';
+    const hhmm = Utilities.formatDate(val, tz, 'hh:mm a');
+    if (hhmm === '12:00 PM') return '12PM';
+    return Utilities.formatDate(val, tz, 'h a').replace(/\s+/g, '');
+  }
+  return String(val).trim();
 }
 
 function setupDailyBackupTrigger() {
@@ -275,7 +290,7 @@ function loadStockIndex_(stockSheet) {
   const values = stockSheet.getRange(2, 1, lastRow - 1, 7).getValues();
   for (let i = 0; i < values.length; i++) {
     const brand = String(values[i][0] || '').trim();
-    const model = String(values[i][1] || '').trim();
+    const model = normalizeModelCell_(values[i][1]);
     if (!brand || !model) continue;
     const key = brand.toLowerCase() + '::' + model.toLowerCase();
     map.set(key, {
@@ -583,6 +598,7 @@ function handleAddModel_(payload) {
   const dt = getDateTimeParts_(payload.timestamp);
 
   const newRow = stockSheet.getLastRow() + 1;
+  stockSheet.getRange(newRow, 2).setNumberFormat('@');
   stockSheet.getRange(newRow, 1, 1, 7).setValues([[
     brand,
     model,
@@ -628,6 +644,7 @@ function handleSeedInventory_(payload) {
     ];
   });
 
+  stockSheet.getRange(2, 2, rows.length, 1).setNumberFormat('@');
   stockSheet.getRange(2, 1, rows.length, 7).setValues(rows);
   refreshPrintView();
   return { ok: true, seeded: rows.length };
@@ -645,7 +662,7 @@ function getFullSyncData_(limit) {
     const vals = stockSheet.getRange(2, 1, stockSheet.getLastRow() - 1, 7).getValues();
     for (let i = 0; i < vals.length; i++) {
       const brand = String(vals[i][0] || '').trim();
-      const model = String(vals[i][1] || '').trim();
+      const model = normalizeModelCell_(vals[i][1]);
       if (!brand || !model) continue;
       stock.push({
         id: (brand + '-' + model).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
