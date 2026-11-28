@@ -214,7 +214,7 @@
     }
     try {
       const sep = state.apiUrl.includes('?') ? '&' : '?';
-      const res = await fetch(`${state.apiUrl}${sep}action=sync`);
+      const res = await fetch(`${state.apiUrl}${sep}action=sync&_t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Sync failed');
       // Save a local pre-sync snapshot before overwriting local state
@@ -1423,7 +1423,8 @@
         items: state.stock,
       });
       if (resp && !resp.ok && String(resp.error || '').includes('already has data')) {
-        if (confirm('Google Sheet mein pehle se stock maujood hai. Kya aap app ka mojooda stock Google Sheet par overwrite karna chahte hain?')) {
+        const confirmText = prompt('KHABARDAR: Google Sheet mein pehle se stock maujood hai! Agar aap app ka stock Sheet par overwrite karna chahte hain to YES likhein:');
+        if (String(confirmText || '').trim().toUpperCase() === 'YES') {
           resp = await sendToSheet({
             action: 'seed_inventory',
             overwrite: true,
