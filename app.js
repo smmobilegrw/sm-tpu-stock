@@ -584,7 +584,7 @@
     }
 
     const html = list
-      .slice(0, 150)
+      .slice(0, 1000)
       .map((item) => {
         const myQty = getQty(item, myBranch);
         const otherQty = getQty(item, other);
@@ -630,8 +630,8 @@
       .join('');
 
     const overflowNote =
-      list.length > 150
-        ? `<div class="panel-card"><p class="muted">${list.length - 150} mazeed models hain — search ya brand filter use karein.</p></div>`
+      list.length > 1000
+        ? `<div class="panel-card"><p class="muted">${list.length - 1000} mazeed models hain — search ya brand filter use karein.</p></div>`
         : '';
     els.stockList.innerHTML = html + overflowNote;
   }
