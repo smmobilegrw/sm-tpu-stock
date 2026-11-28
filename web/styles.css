@@ -107,6 +107,8 @@ body {
 }
 
 .sync-badge {
+  border: none;
+  cursor: pointer;
   font-size: 11px;
   font-weight: 600;
   padding: 4px 9px;
@@ -754,6 +756,21 @@ body {
   border-radius: 16px;
   padding: 18px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-tall {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-scroll-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
 }
 
 .branch-cards {
