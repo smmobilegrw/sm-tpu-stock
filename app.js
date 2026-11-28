@@ -68,15 +68,27 @@
     toastTimer: null,
   };
 
+  function repairCorruptedModels(stockList) {
+    if (!Array.isArray(stockList)) return stockList;
+    return stockList.map((item) => {
+      if (item && item.brand === 'iPhone' && String(item.model || '').includes('1899')) {
+        return { ...item, id: 'iphone-12pm', model: '12PM' };
+      }
+      return item;
+    });
+  }
+
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return buildInitialState();
       const parsed = JSON.parse(raw);
-      return {
+      const merged = {
         ...buildInitialState(),
         ...parsed,
       };
+      merged.stock = repairCorruptedModels(merged.stock);
+      return merged;
     } catch {
       return buildInitialState();
     }
@@ -161,28 +173,33 @@
       return { ok: true, remainingCount: 0, lastError: '' };
     }
     const remaining = [];
-    let failed = false;
+    let networkStopped = false;
     let lastError = '';
     for (const tx of state.pendingQueue) {
-      if (failed) {
+      if (networkStopped) {
         remaining.push(tx);
         continue;
       }
       const resp = await sendToSheet(tx);
       if (resp && resp.ok) {
         continue;
-      } else {
-        failed = true;
-        lastError = (resp && resp.error) || 'Upload failed';
+      }
+      const errMsg = (resp && resp.error) || 'Upload failed';
+      lastError = errMsg;
+      // Stop early only on network/offline errors; for validation errors keep checking next items
+      if (!resp || resp.offline || errMsg === 'Network error') {
+        networkStopped = true;
         remaining.push(tx);
+      } else {
+        remaining.push({ ...tx, syncError: errMsg });
       }
     }
     state.pendingQueue = remaining;
-    if (!failed) {
+    if (remaining.length === 0) {
       state.lastSyncedAt = new Date().toISOString();
     }
     saveState();
-    return { ok: !failed, remainingCount: remaining.length, lastError };
+    return { ok: remaining.length === 0, remainingCount: remaining.length, lastError };
   }
 
   async function syncFromSheet() {
@@ -205,7 +222,7 @@
         localStorage.setItem(PRESYNC_BACKUP_KEY, JSON.stringify(state));
       } catch (_) {}
       if (Array.isArray(data.stock) && data.stock.length > 0) {
-        state.stock = data.stock;
+        state.stock = repairCorruptedModels(data.stock);
       }
       if (Array.isArray(data.sales)) state.sales = data.sales;
       if (Array.isArray(data.stockIn)) state.stockIn = data.stockIn;
@@ -952,7 +969,10 @@
       els.pendingQueueList.innerHTML = q
         .map((tx, idx) => {
           const line = formatPendingEntryText(tx, idx);
-          return `<div class="log-item"><div>${escapeHtml(line)}</div></div>`;
+          const errHtml = tx.syncError
+            ? `<div class="muted" style="color:var(--red);margin-top:2px;">Error: ${escapeHtml(tx.syncError)}</div>`
+            : '';
+          return `<div class="log-item"><div><div>${escapeHtml(line)}</div>${errHtml}</div><button class="btn btn-text btn-sm" data-drop-pending="${idx}" type="button" title="Remove">&times;</button></div>`;
         })
         .join('');
     }
@@ -1427,6 +1447,16 @@
     els.syncBadge.addEventListener('click', openPendingModal);
     els.openPendingBtn.addEventListener('click', openPendingModal);
     els.closePendingModalBtn.addEventListener('click', () => els.pendingModal.classList.add('hidden'));
+    els.pendingQueueList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-drop-pending]');
+      if (!btn) return;
+      const idx = Number(btn.dataset.dropPending);
+      if (Number.isNaN(idx) || idx < 0 || idx >= state.pendingQueue.length) return;
+      state.pendingQueue.splice(idx, 1);
+      saveState();
+      openPendingModal();
+      showToast('Pending entry hata di gayi.');
+    });
     els.reapplyPendingBtn.addEventListener('click', reapplyPendingToLocalStock);
 
     els.copyPendingBtn.addEventListener('click', async () => {
