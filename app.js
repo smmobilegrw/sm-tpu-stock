@@ -86,6 +86,8 @@
       const merged = {
         ...buildInitialState(),
         ...parsed,
+        activeBranch: BRANCH_1,
+        lockOtherBranch: false,
       };
       merged.stock = repairCorruptedModels(merged.stock);
       return merged;
@@ -423,7 +425,7 @@
       showToast('Batch cart khali hai.');
       return;
     }
-    const branch = els.stockInBranchSelect.value;
+    const branch = BRANCH_1;
     const note = els.stockInNoteInput.value.trim();
     const batchId = makeTxId('IN');
     const dt = todayStr();
@@ -470,7 +472,7 @@
     const brand = els.newModelBrandInput.value.trim();
     const model = els.newModelNameInput.value.trim();
     const b1 = Math.max(0, Number(els.newModelB1Input.value) || 0);
-    const b2 = Math.max(0, Number(els.newModelB2Input.value) || 0);
+    const b2 = 0;
 
     if (!brand || !model) {
       showToast('Company aur Model dono likhein.');
@@ -511,15 +513,14 @@
     els.newModelBrandInput.value = '';
     els.newModelNameInput.value = '';
     els.newModelB1Input.value = '0';
-    els.newModelB2Input.value = '0';
     showToast(`Added ${brand} ${model}`);
   }
 
   // ---- Rendering ----
   function updateHeader() {
-    els.activeBranchLabel.textContent = state.activeBranch;
+    els.activeBranchLabel.textContent = 'SM Shop';
     els.activeUserLabel.textContent = state.userName || 'User';
-    els.branchSwitchBtn.classList.toggle('b2', state.activeBranch === BRANCH_2);
+    els.branchSwitchBtn.classList.remove('b2');
 
     if (!state.apiUrl) {
       els.syncBadge.textContent = 'Local Mode';
@@ -543,18 +544,14 @@
   function getFilteredStock() {
     const q = normalizeSearch(ui.search);
     const terms = q ? q.split(' ') : [];
-    const myBranch = state.activeBranch;
-    const other = otherBranch(myBranch);
 
     return state.stock.filter((item) => {
       if (ui.brand !== 'ALL' && item.brand !== ui.brand) return false;
 
-      const myQty = getQty(item, myBranch);
-      const otherQty = getQty(item, other);
+      const myQty = getQty(item, BRANCH_1);
       if (ui.statusFilter === 'instock' && myQty <= 0) return false;
       if (ui.statusFilter === 'low' && (myQty < 1 || myQty > (item.minAlert || 2))) return false;
       if (ui.statusFilter === 'zero' && myQty !== 0) return false;
-      if (ui.statusFilter === 'other' && !(myQty === 0 && otherQty > 0)) return false;
 
       if (terms.length > 0) {
         const hay = normalizeSearch(`${item.brand} ${item.model}`);
@@ -566,16 +563,10 @@
 
   function renderStockList() {
     const list = getFilteredStock();
-    const myBranch = state.activeBranch;
-    const other = otherBranch(myBranch);
-    const myShort = myBranch === BRANCH_1 ? 'B1' : 'B2';
-    const otherShort = other === BRANCH_1 ? 'B1' : 'B2';
-
-    const myTotal = state.stock.reduce((s, x) => s + getQty(x, myBranch), 0);
-    const otherTotal = state.stock.reduce((s, x) => s + getQty(x, other), 0);
+    const myTotal = state.stock.reduce((s, x) => s + getQty(x, BRANCH_1), 0);
     els.stockMiniStats.innerHTML = `
       <span>Showing ${list.length} models</span>
-      <span>${myBranch}: ${myTotal} pcs | ${otherShort}: ${otherTotal} pcs</span>
+      <span>Total Stock: ${myTotal} pcs</span>
     `;
 
     if (list.length === 0) {
@@ -586,14 +577,8 @@
     const html = list
       .slice(0, 1000)
       .map((item) => {
-        const myQty = getQty(item, myBranch);
-        const otherQty = getQty(item, other);
+        const myQty = getQty(item, BRANCH_1);
         const qtyClass = myQty === 0 ? 'zero' : myQty <= (item.minAlert || 2) ? 'low' : 'ok';
-
-        const pullBtn =
-          myQty === 0 && otherQty > 0
-            ? `<button class="quick-pull-btn" data-action="pull" data-id="${escapeHtml(item.id)}" type="button">Mangwao</button>`
-            : '';
 
         const actionsHtml = ui.auditMode
           ? `
@@ -607,7 +592,6 @@
           `
           : `
             <div class="card-actions">
-              ${pullBtn}
               <button class="quick-sell-btn" data-action="sell1" data-id="${escapeHtml(item.id)}" type="button" ${myQty <= 0 ? 'disabled' : ''}>-1 Sell</button>
               <button class="more-btn" data-action="open" data-id="${escapeHtml(item.id)}" type="button">...</button>
             </div>
@@ -619,8 +603,7 @@
               <span class="brand-tag">${escapeHtml(item.brand)}</span>
               <div class="model-name">${escapeHtml(item.model)}</div>
               <div class="branch-compare">
-                <span class="qty-pill ${qtyClass}">${myShort}: ${myQty} pcs</span>
-                <span class="other-pill ${otherQty > 0 ? 'has-stock' : ''}">${otherShort}: ${otherQty}</span>
+                <span class="qty-pill ${qtyClass}">Stock: ${myQty} pcs</span>
               </div>
             </div>
             ${actionsHtml}
@@ -662,7 +645,6 @@
 
     const q = normalizeSearch(ui.stockInSearch);
     const terms = q ? q.split(' ') : [];
-    const targetBranch = els.stockInBranchSelect.value;
     const matches = state.stock
       .filter((item) => {
         if (terms.length === 0) return true;
@@ -673,7 +655,7 @@
 
     els.stockInPickerList.innerHTML = matches
       .map((item) => {
-        const cur = getQty(item, targetBranch);
+        const cur = getQty(item, BRANCH_1);
         const inCart = ui.cart[item.id];
         const inCartBadge = inCart
           ? `<span class="qty-pill ok">Cart: +${inCart.qty}</span>`
@@ -684,7 +666,7 @@
             <span class="brand-tag">${escapeHtml(item.brand)}</span>
             <div class="model-name">${escapeHtml(item.model)}</div>
             <div class="branch-compare">
-              <span class="other-pill">${targetBranch}: ${cur} pcs</span>
+              <span class="other-pill">Stock: ${cur} pcs</span>
               ${inCartBadge}
             </div>
           </div>
@@ -700,77 +682,17 @@
       .join('');
   }
 
-  function renderTransferTab() {
-    const myBranch = state.activeBranch;
-    const other = otherBranch(myBranch);
-    const needed = state.stock.filter((item) => getQty(item, myBranch) === 0 && getQty(item, other) > 0);
-    els.availableOtherCount.textContent = needed.length;
-
-    if (needed.length === 0) {
-      els.crossBranchNeededList.innerHTML = `<p class="muted">Abhi aisa koi model nahi jo ${myBranch} mein zero ho aur ${other} mein available ho.</p>`;
-    } else {
-      els.crossBranchNeededList.innerHTML = needed
-        .slice(0, 40)
-        .map(
-          (item) => `
-        <div class="stock-card">
-          <div class="stock-info">
-            <span class="brand-tag">${escapeHtml(item.brand)}</span>
-            <div class="model-name">${escapeHtml(item.model)}</div>
-            <div class="branch-compare">
-              <span class="qty-pill zero">${myBranch}: 0</span>
-              <span class="other-pill has-stock">${other}: ${getQty(item, other)} pcs</span>
-            </div>
-          </div>
-          <div class="card-actions">
-            <button class="quick-pull-btn" data-pull-one="${escapeHtml(item.id)}" type="button">+1 Mangwao</button>
-            <button class="more-btn" data-action="open-transfer" data-id="${escapeHtml(item.id)}" type="button">Custom</button>
-          </div>
-        </div>
-      `
-        )
-        .join('');
-    }
-
-    if (state.transfers.length === 0) {
-      els.transferHistoryList.innerHTML = `<p class="muted">Abhi koi transfer nahi hua.</p>`;
-    } else {
-      els.transferHistoryList.innerHTML = state.transfers
-        .slice(0, 30)
-        .map(
-          (t) => `
-        <div class="log-item">
-          <div>
-            <strong>${escapeHtml(t.brand)} ${escapeHtml(t.model)}</strong>
-            <div class="muted">${escapeHtml(t.fromBranch)} &rarr; ${escapeHtml(t.toBranch)} &bull; ${t.date} ${t.time}</div>
-          </div>
-          <span class="count-pill">${t.qty} pcs</span>
-        </div>
-      `
-        )
-        .join('');
-    }
-  }
-
   function renderReportsTab() {
     const date = ui.reportDate;
-    const br = ui.reportBranch;
-    const matchBranch = (b) => br === 'ALL' || b === br;
-
-    const sales = state.sales.filter((s) => s.date === date && matchBranch(s.branch));
-    const stockIn = state.stockIn.filter((s) => s.date === date && matchBranch(s.branch));
-    const transfers = state.transfers.filter(
-      (t) => t.date === date && (br === 'ALL' || t.fromBranch === br || t.toBranch === br)
-    );
+    const sales = state.sales.filter((s) => s.date === date);
+    const stockIn = state.stockIn.filter((s) => s.date === date);
 
     const soldPcs = sales.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
     const addedPcs = stockIn.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
-    const trPcs = transfers.reduce((sum, t) => sum + (Number(t.qty) || 0), 0);
 
     els.reportSummaryCards.innerHTML = `
       <div class="kpi-box"><small>Sold (${date})</small><strong>${soldPcs}</strong></div>
       <div class="kpi-box"><small>Stock Added</small><strong>${addedPcs}</strong></div>
-      <div class="kpi-box"><small>Transferred</small><strong>${trPcs}</strong></div>
     `;
 
     if (ui.reportTab === 'sales') {
@@ -781,7 +703,7 @@
             <div class="log-item">
               <div>
                 <strong>${escapeHtml(s.brand)} ${escapeHtml(s.model)}</strong>
-                <div class="muted">${escapeHtml(s.branch)} &bull; ${escapeHtml(s.user)} &bull; ${s.time}</div>
+                <div class="muted">${escapeHtml(s.user)} &bull; ${s.time}</div>
               </div>
               <span class="qty-pill ${s.qty < 0 ? 'low' : 'ok'}">${s.qty > 0 ? '-' + s.qty : '+' + Math.abs(s.qty)}</span>
             </div>`
@@ -796,43 +718,27 @@
             <div class="log-item">
               <div>
                 <strong>${escapeHtml(s.brand)} ${escapeHtml(s.model)}</strong>
-                <div class="muted">${escapeHtml(s.branch)} &bull; ${escapeHtml(s.user)} ${s.note ? '&bull; ' + escapeHtml(s.note) : ''}</div>
+                <div class="muted">${escapeHtml(s.user)} ${s.note ? '&bull; ' + escapeHtml(s.note) : ''}</div>
               </div>
               <span class="qty-pill ok">+${s.qty}</span>
             </div>`
             )
             .join('')}</div>`
         : `<p class="muted">${date} ko koi naya maal add nahi hua.</p>`;
-    } else if (ui.reportTab === 'transfers') {
-      els.reportTabContent.innerHTML = transfers.length
-        ? `<div class="log-list">${transfers
-            .map(
-              (t) => `
-            <div class="log-item">
-              <div>
-                <strong>${escapeHtml(t.brand)} ${escapeHtml(t.model)}</strong>
-                <div class="muted">${escapeHtml(t.fromBranch)} &rarr; ${escapeHtml(t.toBranch)} &bull; ${t.time}</div>
-              </div>
-              <span class="count-pill">${t.qty}</span>
-            </div>`
-            )
-            .join('')}</div>`
-        : `<p class="muted">${date} ko koi transfer nahi hua.</p>`;
     } else {
-      const target = br === 'ALL' ? state.activeBranch : br;
-      const lowItems = state.stock.filter((x) => getQty(x, target) <= (x.minAlert || 2));
+      const lowItems = state.stock.filter((x) => getQty(x, BRANCH_1) <= (x.minAlert || 2));
       els.reportTabContent.innerHTML = lowItems.length
-        ? `<p class="muted mb-8"><strong>${escapeHtml(target)}</strong> mein 0 ya low stock (${lowItems.length} models):</p>
+        ? `<p class="muted mb-8">0 ya low stock (${lowItems.length} models):</p>
            <div class="log-list mt-8">${lowItems
              .map(
                (x) => `
             <div class="log-item">
               <div><strong>${escapeHtml(x.brand)} ${escapeHtml(x.model)}</strong></div>
-              <span class="qty-pill ${getQty(x, target) === 0 ? 'zero' : 'low'}">${getQty(x, target)} pcs</span>
+              <span class="qty-pill ${getQty(x, BRANCH_1) === 0 ? 'zero' : 'low'}">${getQty(x, BRANCH_1)} pcs</span>
             </div>`
              )
              .join('')}</div>`
-        : `<p class="muted">${target} mein sab models full hain!</p>`;
+        : `<p class="muted">Sab models full hain!</p>`;
     }
   }
 
@@ -848,11 +754,11 @@
       <div class="print-brand-box">
         <h4>${escapeHtml(brand)}</h4>
         <table>
-          <thead><tr><th>Model</th><th class="num">B1</th><th class="num">B2</th><th class="num">Tot</th></tr></thead>
+          <thead><tr><th>Model</th><th class="num">Qty</th></tr></thead>
           <tbody>
             ${items
               .map(
-                (i) => `<tr><td>${escapeHtml(i.model)}</td><td class="num">${i.branch1}</td><td class="num">${i.branch2}</td><td class="num">${i.branch1 + i.branch2}</td></tr>`
+                (i) => `<tr><td>${escapeHtml(i.model)}</td><td class="num">${i.branch1}</td></tr>`
               )
               .join('')}
           </tbody>
@@ -869,9 +775,7 @@
   }
 
   function renderSettings() {
-    els.settingsBranchSelect.value = state.activeBranch;
     els.settingsUserInput.value = state.userName;
-    els.settingsLockOtherBranch.checked = !!state.lockOtherBranch;
     els.settingsApiUrlInput.value = state.apiUrl || '';
 
     const brands = getAllBrands();
@@ -883,7 +787,6 @@
     renderBrandPills();
     renderStockList();
     renderStockInTab();
-    renderTransferTab();
     renderReportsTab();
     renderSettings();
   }
@@ -897,20 +800,11 @@
     els.modalBrandBadge.textContent = item.brand;
     els.modalModelTitle.textContent = item.model;
     els.modalB1Qty.textContent = item.branch1;
-    els.modalB2Qty.textContent = item.branch2;
 
-    els.modalSellBranch.innerHTML = state.lockOtherBranch
-      ? `<option value="${state.activeBranch}">${state.activeBranch}</option>`
-      : `<option value="${BRANCH_1}">${BRANCH_1}</option><option value="${BRANCH_2}">${BRANCH_2}</option>`;
-    els.modalSellBranch.value = state.activeBranch;
-    els.modalAuditBranch.innerHTML = els.modalSellBranch.innerHTML;
-    els.modalAuditBranch.value = state.activeBranch;
-    els.auditQtyInput.value = String(getQty(item, state.activeBranch));
+    els.auditQtyInput.value = String(getQty(item, BRANCH_1));
     els.auditReasonInput.value = '';
     els.sellQtyInput.value = '1';
     els.sellNoteInput.value = '';
-    els.trQtyInput.value = '1';
-    els.modalTransferDir.value = state.activeBranch === BRANCH_1 ? '2to1' : '1to2';
 
     setModalMode(defaultMode);
     els.itemActionModal.classList.remove('hidden');
@@ -922,7 +816,6 @@
       b.classList.toggle('active', b.dataset.modalMode === mode);
     });
     els.modalSellSection.classList.toggle('hidden', mode !== 'sell');
-    els.modalTransferSection.classList.toggle('hidden', mode !== 'transfer');
     els.modalAuditSection.classList.toggle('hidden', mode !== 'audit');
   }
 
@@ -1058,20 +951,19 @@
     [
       'branchSwitchBtn', 'activeBranchLabel', 'activeUserLabel', 'syncBadge', 'syncNowBtn',
       'stockSearchInput', 'clearSearchBtn', 'brandPills', 'stockStatusFilters', 'auditModeBtn', 'auditBanner', 'stockMiniStats', 'stockList',
-      'openAddModelBtn', 'stockInBranchSelect', 'stockInNoteInput', 'stockInSearchInput',
+      'openAddModelBtn', 'stockInNoteInput', 'stockInSearchInput',
       'stockInCartCard', 'cartItemCount', 'cartTotalPcs', 'clearCartBtn', 'stockInCartList', 'confirmStockInBtn', 'stockInPickerList',
-      'availableOtherCount', 'crossBranchNeededList', 'transferHistoryList',
-      'copyOrderListBtn', 'printSheetBtn', 'reportDateInput', 'reportBranchFilter', 'reportSummaryCards', 'reportTabContent', 'printableArea',
-      'settingsBranchSelect', 'settingsUserInput', 'settingsLockOtherBranch', 'saveProfileBtn',
+      'copyOrderListBtn', 'printSheetBtn', 'reportDateInput', 'reportSummaryCards', 'reportTabContent', 'printableArea',
+      'settingsUserInput', 'saveProfileBtn',
       'settingsApiUrlInput', 'saveApiUrlBtn', 'pushSeedBtn', 'pullSyncBtn', 'runBackupBtn', 'apiStatusMessage',
       'exportCsvBtn', 'exportJsonBtn', 'importJsonBtn', 'importJsonInput', 'openPendingBtn', 'restoreBackupBtn', 'resetDemoBtn',
       'pendingModal', 'pendingModalCount', 'closePendingModalBtn', 'reapplyPendingBtn', 'copyPendingBtn', 'flushPendingBtn', 'pendingUploadError', 'pendingQueueList',
-      'branchModal', 'modalUserInput', 'closeBranchModalBtn',
-      'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty', 'modalB2Qty',
-      'closeItemModalBtn', 'modalSellBranch', 'sellQtyMinus', 'sellQtyInput', 'sellQtyPlus', 'sellNoteInput', 'confirmSellBtn',
-      'modalSellSection', 'modalTransferSection', 'modalTransferDir', 'trQtyMinus', 'trQtyInput', 'trQtyPlus', 'confirmTransferBtn',
-      'modalAuditSection', 'modalAuditBranch', 'auditQtyMinus', 'auditQtyInput', 'auditQtyPlus', 'auditZeroBtn', 'auditReasonInput', 'confirmAuditBtn',
-      'addModelModal', 'closeAddModelBtn', 'newModelBrandInput', 'brandDataList', 'newModelNameInput', 'newModelB1Input', 'newModelB2Input', 'confirmAddModelBtn',
+      'branchModal', 'modalUserInput', 'saveModalUserBtn', 'closeBranchModalBtn',
+      'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty',
+      'closeItemModalBtn', 'sellQtyMinus', 'sellQtyInput', 'sellQtyPlus', 'sellNoteInput', 'confirmSellBtn',
+      'modalSellSection',
+      'modalAuditSection', 'auditQtyMinus', 'auditQtyInput', 'auditQtyPlus', 'auditZeroBtn', 'auditReasonInput', 'confirmAuditBtn',
+      'addModelModal', 'closeAddModelBtn', 'newModelBrandInput', 'brandDataList', 'newModelNameInput', 'newModelB1Input', 'confirmAddModelBtn',
       'toast', 'toastMsg', 'toastUndoBtn',
     ].forEach((id) => {
       els[id] = document.getElementById(id);
@@ -1163,8 +1055,6 @@
     });
 
     // Stock In
-    els.stockInBranchSelect.value = state.activeBranch;
-    els.stockInBranchSelect.addEventListener('change', renderStockInTab);
     els.stockInSearchInput.addEventListener('input', (e) => {
       ui.stockInSearch = e.target.value;
       renderStockInTab();
@@ -1234,25 +1124,10 @@
 
     els.confirmStockInBtn.addEventListener('click', submitStockInBatch);
 
-    // Transfer tab
-    els.crossBranchNeededList.addEventListener('click', (e) => {
-      const pullBtn = e.target.closest('[data-pull-one]');
-      if (pullBtn) {
-        transferItem(pullBtn.dataset.pullOne, otherBranch(state.activeBranch), state.activeBranch, 1, 'Cross-branch pull');
-        return;
-      }
-      const openBtn = e.target.closest('[data-action="open-transfer"]');
-      if (openBtn) openItemModal(openBtn.dataset.id, 'transfer');
-    });
-
     // Reports
     els.reportDateInput.value = ui.reportDate;
     els.reportDateInput.addEventListener('change', (e) => {
       ui.reportDate = e.target.value || todayStr();
-      renderReportsTab();
-    });
-    els.reportBranchFilter.addEventListener('change', (e) => {
-      ui.reportBranch = e.target.value;
       renderReportsTab();
     });
     document.querySelectorAll('[data-report-tab]').forEach((btn) => {
@@ -1265,11 +1140,10 @@
     });
 
     els.copyOrderListBtn.addEventListener('click', async () => {
-      const target = ui.reportBranch === 'ALL' ? state.activeBranch : ui.reportBranch;
       const lines = state.stock
-        .filter((x) => getQty(x, target) <= (x.minAlert || 2))
-        .map((x) => `${x.brand} ${x.model}: ${getQty(x, target)} pcs`);
-      const text = `*SM TPU Order List (${target}) — ${todayStr()}*\n` + (lines.length ? lines.join('\n') : 'All models in stock!');
+        .filter((x) => getQty(x, BRANCH_1) <= (x.minAlert || 2))
+        .map((x) => `${x.brand} ${x.model}: ${getQty(x, BRANCH_1)} pcs`);
+      const text = `*SM TPU Order List — ${todayStr()}*\n` + (lines.length ? lines.join('\n') : 'All models in stock!');
       try {
         await navigator.clipboard.writeText(text);
         showToast('Order list copied! WhatsApp par paste karein.');
@@ -1283,30 +1157,23 @@
       window.print();
     });
 
-    // Branch Modal
+    // User Profile Modal
     els.branchSwitchBtn.addEventListener('click', () => {
       els.modalUserInput.value = state.userName;
-      document.querySelectorAll('.branch-choice').forEach((c) => {
-        c.classList.toggle('selected', c.dataset.branch === state.activeBranch);
-      });
       els.branchModal.classList.remove('hidden');
     });
 
     els.closeBranchModalBtn.addEventListener('click', () => els.branchModal.classList.add('hidden'));
 
-    document.querySelectorAll('.branch-choice').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const chosen = btn.dataset.branch;
-        const customName = els.modalUserInput.value.trim();
-        state.activeBranch = chosen;
-        state.userName = customName || (chosen === BRANCH_1 ? 'Owner (Branch 1)' : 'Bhai (Branch 2)');
-        state.profileSelected = true;
-        els.stockInBranchSelect.value = chosen;
-        saveState();
-        renderAll();
-        els.branchModal.classList.add('hidden');
-        showToast(`Active: ${state.activeBranch} (${state.userName})`);
-      });
+    els.saveModalUserBtn.addEventListener('click', () => {
+      const customName = els.modalUserInput.value.trim();
+      state.activeBranch = BRANCH_1;
+      state.userName = customName || 'Owner';
+      state.profileSelected = true;
+      saveState();
+      renderAll();
+      els.branchModal.classList.add('hidden');
+      showToast(`User: ${state.userName}`);
     });
 
     // Item Action Modal
@@ -1320,25 +1187,10 @@
     els.sellQtyPlus.addEventListener('click', () => {
       els.sellQtyInput.value = (Number(els.sellQtyInput.value) || 1) + 1;
     });
-    els.trQtyMinus.addEventListener('click', () => {
-      els.trQtyInput.value = Math.max(1, (Number(els.trQtyInput.value) || 1) - 1);
-    });
-    els.trQtyPlus.addEventListener('click', () => {
-      els.trQtyInput.value = (Number(els.trQtyInput.value) || 1) + 1;
-    });
 
     els.confirmSellBtn.addEventListener('click', () => {
       const qty = Number(els.sellQtyInput.value) || 1;
-      const ok = sellItem(ui.modalItemId, qty, els.modalSellBranch.value, els.sellNoteInput.value.trim());
-      if (ok) els.itemActionModal.classList.add('hidden');
-    });
-
-    els.confirmTransferBtn.addEventListener('click', () => {
-      const qty = Number(els.trQtyInput.value) || 1;
-      const dir = els.modalTransferDir.value;
-      const from = dir === '2to1' ? BRANCH_2 : BRANCH_1;
-      const to = dir === '2to1' ? BRANCH_1 : BRANCH_2;
-      const ok = transferItem(ui.modalItemId, from, to, qty, 'Modal transfer');
+      const ok = sellItem(ui.modalItemId, qty, BRANCH_1, els.sellNoteInput.value.trim());
       if (ok) els.itemActionModal.classList.add('hidden');
     });
 
@@ -1351,15 +1203,10 @@
     els.auditZeroBtn.addEventListener('click', () => {
       els.auditQtyInput.value = '0';
     });
-    els.modalAuditBranch.addEventListener('change', () => {
-      const item = state.stock.find((x) => x.id === ui.modalItemId);
-      if (item) els.auditQtyInput.value = String(getQty(item, els.modalAuditBranch.value));
-    });
     els.confirmAuditBtn.addEventListener('click', () => {
       const qty = Math.max(0, Number(els.auditQtyInput.value) || 0);
-      const branch = els.modalAuditBranch.value;
       const reason = els.auditReasonInput.value.trim() || 'Physical count / Audit';
-      const ok = adjustStock(ui.modalItemId, qty, branch, reason);
+      const ok = adjustStock(ui.modalItemId, qty, BRANCH_1, reason);
       if (ok) els.itemActionModal.classList.add('hidden');
     });
 
@@ -1379,11 +1226,9 @@
 
     // Settings
     els.saveProfileBtn.addEventListener('click', () => {
-      state.activeBranch = els.settingsBranchSelect.value;
-      state.userName = els.settingsUserInput.value.trim() || state.activeBranch;
-      state.lockOtherBranch = els.settingsLockOtherBranch.checked;
+      state.activeBranch = BRANCH_1;
+      state.userName = els.settingsUserInput.value.trim() || 'Owner';
       state.profileSelected = true;
-      els.stockInBranchSelect.value = state.activeBranch;
       saveState();
       renderAll();
       showToast('Profile saved.');
@@ -1493,9 +1338,9 @@
     });
 
     els.exportCsvBtn.addEventListener('click', () => {
-      const lines = ['Brand,Model,SM Branch 1,SM Branch 2,Total_Qty'];
+      const lines = ['Brand,Model,Qty'];
       for (const i of state.stock) {
-        lines.push(`"${i.brand}","${i.model.replace(/"/g, '""')}",${i.branch1},${i.branch2},${i.branch1 + i.branch2}`);
+        lines.push(`"${i.brand}","${i.model.replace(/"/g, '""')}",${i.branch1}`);
       }
       downloadFile(`sm-tpu-stock-${todayStr()}.csv`, lines.join('\n'), 'text/csv');
     });

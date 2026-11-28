@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f766e" />
-  <title>SM TPU Stock — Branch 1 &amp; 2</title>
+  <title>SM TPU Stock</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="stylesheet" href="./styles.css" />
@@ -17,8 +17,8 @@
         <div class="brand-mark">SM</div>
         <div>
           <h1 class="app-title">SM TPU Stock</h1>
-          <button id="branchSwitchBtn" class="branch-badge" type="button" title="Switch Branch / User">
-            <span id="activeBranchLabel">SM Branch 1</span>
+          <button id="branchSwitchBtn" class="branch-badge" type="button" title="Change User Name">
+            <span id="activeBranchLabel">SM Shop</span>
             <span class="dot-sep">&bull;</span>
             <span id="activeUserLabel">Owner</span>
           </button>
@@ -49,7 +49,6 @@
               <button class="chip" data-filter="instock" type="button">In Stock</button>
               <button class="chip" data-filter="low" type="button">Low (1-2)</button>
               <button class="chip" data-filter="zero" type="button">Out (0)</button>
-              <button class="chip" data-filter="other" type="button">At Other Branch</button>
               <button id="auditModeBtn" class="chip audit-chip" type="button">Fix Qty (Audit)</button>
             </div>
           </div>
@@ -75,19 +74,10 @@
             <button id="openAddModelBtn" class="btn btn-outline btn-sm" type="button">+ New Model</button>
           </div>
 
-          <div class="form-row-2">
-            <label class="field">
-              <span>Kis Branch Mein Add Karna Hai?</span>
-              <select id="stockInBranchSelect">
-                <option value="SM Branch 1">SM Branch 1</option>
-                <option value="SM Branch 2">SM Branch 2</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Note / Supplier (Optional)</span>
-              <input id="stockInNoteInput" type="text" placeholder="e.g. Lahore Lot / Hall Road" />
-            </label>
-          </div>
+          <label class="field mt-8">
+            <span>Note / Supplier (Optional)</span>
+            <input id="stockInNoteInput" type="text" placeholder="e.g. Lahore Lot / Hall Road" />
+          </label>
 
           <div class="search-box mt-8">
             <span class="search-icon">&#128269;</span>
@@ -110,28 +100,7 @@
         <div id="stockInPickerList" class="card-list"></div>
       </section>
 
-      <!-- TAB 3: TRANSFERS (BRANCH 1 <-> BRANCH 2) -->
-      <section id="view-transfer" class="tab-view">
-        <div class="panel-card">
-          <h2>Branch Transfer (Branch 1 &#8644; Branch 2)</h2>
-          <p class="muted">Jab ek branch par cover khatam ho to doosri branch se transfer karein (is se Daily Sale kharab nahi hogi).</p>
-        </div>
-
-        <div class="panel-card">
-          <div class="panel-header-row">
-            <h3>Meri Branch Mein Zero, Doosri Mein Available</h3>
-            <span id="availableOtherCount" class="count-pill">0</span>
-          </div>
-          <div id="crossBranchNeededList" class="card-list compact"></div>
-        </div>
-
-        <div class="panel-card">
-          <h3>Recent Transfers</h3>
-          <div id="transferHistoryList" class="log-list"></div>
-        </div>
-      </section>
-
-      <!-- TAB 4: DAILY REPORTS & PRINT -->
+      <!-- TAB 3: DAILY REPORTS & PRINT -->
       <section id="view-reports" class="tab-view">
         <div class="panel-card no-print">
           <div class="panel-header-row">
@@ -142,27 +111,16 @@
             </div>
           </div>
 
-          <div class="form-row-2 mt-8">
-            <label class="field">
-              <span>Date Select Karein</span>
-              <input id="reportDateInput" type="date" />
-            </label>
-            <label class="field">
-              <span>Branch Filter</span>
-              <select id="reportBranchFilter">
-                <option value="ALL">Dono Branches</option>
-                <option value="SM Branch 1">SM Branch 1</option>
-                <option value="SM Branch 2">SM Branch 2</option>
-              </select>
-            </label>
-          </div>
+          <label class="field mt-8">
+            <span>Date Select Karein</span>
+            <input id="reportDateInput" type="date" />
+          </label>
 
           <div id="reportSummaryCards" class="kpi-grid mt-12"></div>
 
           <div class="subtabs mt-12">
             <button class="subtab active" data-report-tab="sales" type="button">Sales Sheet</button>
             <button class="subtab" data-report-tab="stockin" type="button">Stock-In Sheet</button>
-            <button class="subtab" data-report-tab="transfers" type="button">Transfers</button>
             <button class="subtab" data-report-tab="order" type="button">Order List (0 / Low)</button>
           </div>
         </div>
@@ -173,26 +131,13 @@
         <div id="printableArea" class="print-only"></div>
       </section>
 
-      <!-- TAB 5: SETTINGS & GOOGLE SHEETS SYNC -->
+      <!-- TAB 4: SETTINGS & GOOGLE SHEETS SYNC -->
       <section id="view-settings" class="tab-view">
         <div class="panel-card">
-          <h2>User &amp; Branch Profile</h2>
-          <div class="form-row-2 mt-8">
-            <label class="field">
-              <span>Active Branch</span>
-              <select id="settingsBranchSelect">
-                <option value="SM Branch 1">SM Branch 1</option>
-                <option value="SM Branch 2">SM Branch 2</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>User Name (e.g. Owner / Bhai)</span>
-              <input id="settingsUserInput" type="text" placeholder="Owner" />
-            </label>
-          </div>
-          <label class="toggle-row mt-12">
-            <input id="settingsLockOtherBranch" type="checkbox" checked />
-            <span>Doosri branch ki direct sale lock rakhein (sirf View + Transfer allow ho)</span>
+          <h2>User Profile</h2>
+          <label class="field mt-8">
+            <span>User Name (e.g. Shahzaib / Bhai)</span>
+            <input id="settingsUserInput" type="text" placeholder="Owner" />
           </label>
           <button id="saveProfileBtn" class="btn btn-primary mt-12" type="button">Save Profile</button>
         </div>
@@ -251,10 +196,6 @@
         <span class="nav-icon">&#10133;</span>
         <span>Naya Maal</span>
       </button>
-      <button class="nav-item" data-tab="transfer" type="button">
-        <span class="nav-icon">&#8644;</span>
-        <span>Transfer</span>
-      </button>
       <button class="nav-item" data-tab="reports" type="button">
         <span class="nav-icon">&#128202;</span>
         <span>Reports</span>
@@ -266,30 +207,21 @@
     </nav>
   </div>
 
-  <!-- Branch Onboarding / Switch Modal -->
+  <!-- User Profile Modal -->
   <div id="branchModal" class="modal-backdrop hidden no-print">
     <div class="modal-card">
-      <h2>Apni Branch Select Karein</h2>
-      <p class="muted">Har mobile par apni branch select karein. Aap dono branches ka stock dekh sakte hain, lekin sale sirf apni branch se hogi.</p>
-      <div class="branch-cards mt-12">
-        <button class="branch-choice" data-branch="SM Branch 1" type="button">
-          <strong>SM Branch 1</strong>
-          <span>Main Shop (Existing Stock)</span>
-        </button>
-        <button class="branch-choice" data-branch="SM Branch 2" type="button">
-          <strong>SM Branch 2</strong>
-          <span>Second Shop (Bhai)</span>
-        </button>
-      </div>
+      <h2>Apna Naam Likhain</h2>
+      <p class="muted">Har mobile par user ka naam set karein taake pata rahe kis ne cover sell ya add kiya.</p>
       <label class="field mt-12">
         <span>Aapka Naam (User)</span>
-        <input id="modalUserInput" type="text" placeholder="e.g. Owner ya Bhai" />
+        <input id="modalUserInput" type="text" placeholder="e.g. Shahzaib ya Bhai" />
       </label>
+      <button id="saveModalUserBtn" class="btn btn-primary btn-block mt-12" type="button">Save &amp; Continue</button>
       <button id="closeBranchModalBtn" class="btn btn-text btn-block mt-8" type="button">Cancel</button>
     </div>
   </div>
 
-  <!-- Sell / Transfer Action Modal -->
+  <!-- Sell / Audit Action Modal -->
   <div id="itemActionModal" class="modal-backdrop hidden no-print">
     <div class="modal-card">
       <div class="panel-header-row">
@@ -300,29 +232,18 @@
         <button id="closeItemModalBtn" class="icon-btn" type="button">&times;</button>
       </div>
 
-      <div class="branch-stock-strip mt-12">
-        <div class="bs-box">
-          <small>SM Branch 1</small>
-          <strong id="modalB1Qty">0</strong>
-        </div>
-        <div class="bs-box">
-          <small>SM Branch 2</small>
-          <strong id="modalB2Qty">0</strong>
-        </div>
+      <div class="bs-box mt-12">
+        <small>Mojooda Stock</small>
+        <strong id="modalB1Qty">0</strong>
       </div>
 
       <div class="modal-tabs mt-12">
         <button class="subtab active" data-modal-mode="sell" type="button">Sell Cover</button>
-        <button class="subtab" data-modal-mode="transfer" type="button">Transfer Branch</button>
         <button class="subtab" data-modal-mode="audit" type="button">Fix Qty (Audit)</button>
       </div>
 
       <div id="modalSellSection" class="mt-12">
         <label class="field">
-          <span>Sell Branch</span>
-          <select id="modalSellBranch"></select>
-        </label>
-        <label class="field mt-8">
           <span>Kitne Pcs Sell Hue?</span>
           <div class="qty-stepper">
             <button id="sellQtyMinus" type="button">-</button>
@@ -337,31 +258,8 @@
         <button id="confirmSellBtn" class="btn btn-primary btn-block mt-12" type="button">Confirm Sell</button>
       </div>
 
-      <div id="modalTransferSection" class="mt-12 hidden">
-        <label class="field">
-          <span>Transfer Direction</span>
-          <select id="modalTransferDir">
-            <option value="2to1">SM Branch 2 &rarr; SM Branch 1 (Mangwao)</option>
-            <option value="1to2">SM Branch 1 &rarr; SM Branch 2 (Bhejo)</option>
-          </select>
-        </label>
-        <label class="field mt-8">
-          <span>Kitne Pcs Transfer Karne Hain?</span>
-          <div class="qty-stepper">
-            <button id="trQtyMinus" type="button">-</button>
-            <input id="trQtyInput" type="number" min="1" value="1" />
-            <button id="trQtyPlus" type="button">+</button>
-          </div>
-        </label>
-        <button id="confirmTransferBtn" class="btn btn-purple btn-block mt-12" type="button">Confirm Transfer</button>
-      </div>
-
       <div id="modalAuditSection" class="mt-12 hidden">
         <label class="field">
-          <span>Branch</span>
-          <select id="modalAuditBranch"></select>
-        </label>
-        <label class="field mt-8">
           <span>Actual Ginti (Exact Pcs Kitne Hain?)</span>
           <div class="qty-stepper">
             <button id="auditQtyMinus" type="button">-</button>
@@ -395,16 +293,10 @@
         <span>Model Name</span>
         <input id="newModelNameInput" type="text" placeholder="e.g. A56 5G" />
       </label>
-      <div class="form-row-2 mt-8">
-        <label class="field">
-          <span>SM Branch 1 Qty</span>
-          <input id="newModelB1Input" type="number" min="0" value="0" />
-        </label>
-        <label class="field">
-          <span>SM Branch 2 Qty</span>
-          <input id="newModelB2Input" type="number" min="0" value="0" />
-        </label>
-      </div>
+      <label class="field mt-8">
+        <span>Initial Stock Qty</span>
+        <input id="newModelB1Input" type="number" min="0" value="0" />
+      </label>
       <button id="confirmAddModelBtn" class="btn btn-primary btn-block mt-12" type="button">Add Model</button>
     </div>
   </div>
