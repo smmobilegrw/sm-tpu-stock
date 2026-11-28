@@ -2,6 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'sm_tpu_inventory_state_v1';
+  const PRESYNC_BACKUP_KEY = 'sm_tpu_presync_backup_v1';
   const BRANCH_1 = 'SM Branch 1';
   const BRANCH_2 = 'SM Branch 2';
 
@@ -157,10 +158,11 @@
   async function flushQueue() {
     if (!state.apiUrl || state.pendingQueue.length === 0) {
       updateHeader();
-      return;
+      return { ok: true, remainingCount: 0, lastError: '' };
     }
     const remaining = [];
     let failed = false;
+    let lastError = '';
     for (const tx of state.pendingQueue) {
       if (failed) {
         remaining.push(tx);
@@ -171,6 +173,7 @@
         continue;
       } else {
         failed = true;
+        lastError = (resp && resp.error) || 'Upload failed';
         remaining.push(tx);
       }
     }
@@ -179,6 +182,7 @@
       state.lastSyncedAt = new Date().toISOString();
     }
     saveState();
+    return { ok: !failed, remainingCount: remaining.length, lastError };
   }
 
   async function syncFromSheet() {
@@ -186,12 +190,20 @@
       showToast('Pehle Settings mein Google Apps Script URL lagayein.');
       return;
     }
-    await flushQueue();
+    const qRes = await flushQueue();
+    if (qRes.remainingCount > 0) {
+      showToast(`Sync ruk gaya: ${qRes.remainingCount} local changes upload nahi ho sakin (${qRes.lastError}). Local stock mehfooz hai!`);
+      return;
+    }
     try {
       const sep = state.apiUrl.includes('?') ? '&' : '?';
       const res = await fetch(`${state.apiUrl}${sep}action=sync`);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Sync failed');
+      // Save a local pre-sync snapshot before overwriting local state
+      try {
+        localStorage.setItem(PRESYNC_BACKUP_KEY, JSON.stringify(state));
+      } catch (_) {}
       if (Array.isArray(data.stock) && data.stock.length > 0) {
         state.stock = data.stock;
       }
@@ -925,7 +937,7 @@
       'copyOrderListBtn', 'printSheetBtn', 'reportDateInput', 'reportBranchFilter', 'reportSummaryCards', 'reportTabContent', 'printableArea',
       'settingsBranchSelect', 'settingsUserInput', 'settingsLockOtherBranch', 'saveProfileBtn',
       'settingsApiUrlInput', 'saveApiUrlBtn', 'pushSeedBtn', 'pullSyncBtn', 'runBackupBtn', 'apiStatusMessage',
-      'exportCsvBtn', 'exportJsonBtn', 'resetDemoBtn',
+      'exportCsvBtn', 'exportJsonBtn', 'restoreBackupBtn', 'resetDemoBtn',
       'branchModal', 'modalUserInput', 'closeBranchModalBtn',
       'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty', 'modalB2Qty',
       'closeItemModalBtn', 'modalSellBranch', 'sellQtyMinus', 'sellQtyInput', 'sellQtyPlus', 'sellNoteInput', 'confirmSellBtn',
@@ -1277,15 +1289,28 @@
     els.pushSeedBtn.addEventListener('click', async () => {
       if (!state.apiUrl) return showToast('Pehle Apps Script URL save karein.');
       showToast('Pushing stock to Google Sheet...');
-      const resp = await sendToSheet({
+      let resp = await sendToSheet({
         action: 'seed_inventory',
         overwrite: false,
         items: state.stock,
       });
+      if (resp && !resp.ok && String(resp.error || '').includes('already has data')) {
+        if (confirm('Google Sheet mein pehle se stock maujood hai. Kya aap app ka mojooda stock Google Sheet par overwrite karna chahte hain?')) {
+          resp = await sendToSheet({
+            action: 'seed_inventory',
+            overwrite: true,
+            items: state.stock,
+          });
+        } else {
+          return;
+        }
+      }
       if (resp && resp.ok) {
-        showToast(`Success! ${resp.seeded} models Google Sheet mein add ho gaye.`);
+        state.pendingQueue = [];
+        saveState();
+        showToast(`Success! ${resp.seeded} models Google Sheet par update ho gaye.`);
       } else {
-        showToast(resp.error || 'Push failed.');
+        showToast((resp && resp.error) || 'Push failed.');
       }
     });
 
@@ -1309,6 +1334,23 @@
 
     els.exportJsonBtn.addEventListener('click', () => {
       downloadFile(`sm-tpu-backup-${todayStr()}.json`, JSON.stringify(state, null, 2), 'application/json');
+    });
+
+    els.restoreBackupBtn.addEventListener('click', () => {
+      const raw = localStorage.getItem(PRESYNC_BACKUP_KEY);
+      if (!raw) {
+        showToast('Koi pre-sync local backup maujood nahi hai.');
+        return;
+      }
+      if (!confirm('Kya aap aakhri Sync se pehle wala local stock wapas lana chahte hain?')) return;
+      try {
+        state = { ...buildInitialState(), ...JSON.parse(raw) };
+        saveState();
+        renderAll();
+        showToast('Pre-sync local backup restore ho gaya!');
+      } catch {
+        showToast('Backup restore nahi ho saka.');
+      }
     });
 
     els.resetDemoBtn.addEventListener('click', () => {

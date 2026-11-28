@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sm-tpu-v3';
+const CACHE_NAME = 'sm-tpu-v4';
 const APP_SHELL = [
   './',
   './index.html',
