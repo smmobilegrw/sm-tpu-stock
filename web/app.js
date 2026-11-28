@@ -204,17 +204,25 @@
     return { ok: remaining.length === 0, remainingCount: remaining.length, lastError };
   }
 
-  async function syncFromSheet() {
+  let isSyncing = false;
+  let lastAutoSyncAt = 0;
+
+  async function syncFromSheet(opts) {
+    const silent = Boolean(opts && opts.silent);
     if (!state.apiUrl) {
-      showToast('Pehle Settings mein Google Apps Script URL lagayein.');
+      if (!silent) showToast('Pehle Settings mein Google Apps Script URL lagayein.');
       return;
     }
-    const qRes = await flushQueue();
-    if (qRes.remainingCount > 0) {
-      showToast(`Sync ruk gaya: ${qRes.remainingCount} local changes upload nahi ho sakin (${qRes.lastError}). Local stock mehfooz hai!`);
-      return;
-    }
+    if (isSyncing) return;
+    isSyncing = true;
     try {
+      const qRes = await flushQueue();
+      if (qRes.remainingCount > 0) {
+        if (!silent) {
+          showToast(`Sync ruk gaya: ${qRes.remainingCount} local changes upload nahi ho sakin (${qRes.lastError}). Local stock mehfooz hai!`);
+        }
+        return;
+      }
       const sep = state.apiUrl.includes('?') ? '&' : '?';
       const res = await fetch(`${state.apiUrl}${sep}action=sync&_t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
@@ -230,12 +238,22 @@
       if (Array.isArray(data.stockIn)) state.stockIn = data.stockIn;
       if (Array.isArray(data.transfers)) state.transfers = data.transfers;
       state.lastSyncedAt = new Date().toISOString();
+      lastAutoSyncAt = Date.now();
       saveState();
       renderAll();
-      showToast(`Google Sheet synced (${state.stock.length} models).`);
+      if (!silent) showToast(`Google Sheet synced (${state.stock.length} models).`);
     } catch (err) {
-      showToast('Sync error: ' + err.message);
+      if (!silent) showToast('Sync error: ' + err.message);
+    } finally {
+      isSyncing = false;
     }
+  }
+
+  function triggerAutoSync(force = false) {
+    if (!state.apiUrl || navigator.onLine === false) return;
+    if (ui.auditMode || isSyncing) return;
+    if (!force && Date.now() - lastAutoSyncAt < 6000) return;
+    syncFromSheet({ silent: true });
   }
 
   // ---- Core Business Actions ----
@@ -1424,9 +1442,22 @@
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    window.addEventListener('online', () => {
-      flushQueue();
+    // Auto-sync on app open, when returning from background, when back online, and every 45s while visible
+    triggerAutoSync(true);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        triggerAutoSync();
+      }
     });
+    window.addEventListener('focus', () => triggerAutoSync());
+    window.addEventListener('pageshow', () => triggerAutoSync());
+    window.addEventListener('online', () => triggerAutoSync(true));
+    setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        triggerAutoSync();
+      }
+    }, 45000);
   }
 
   document.addEventListener('DOMContentLoaded', init);
