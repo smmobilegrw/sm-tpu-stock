@@ -918,6 +918,113 @@
     });
   }
 
+  function formatPendingEntryText(tx, idx) {
+    const dt = tx.timestamp ? tx.timestamp.slice(0, 16).replace('T', ' ') : '';
+    if (tx.action === 'adjust_stock') {
+      return `${idx + 1}. [Fix Qty] ${tx.brand} ${tx.model} -> ${tx.newQty} pcs (${tx.branch}) ${dt}`;
+    }
+    if (tx.action === 'stock_in') {
+      const list = (tx.items || []).map((i) => `${i.brand} ${i.model} (+${i.qty})`).join(', ');
+      return `${idx + 1}. [Naya Maal] ${tx.branch}: ${list} ${dt}`;
+    }
+    if (tx.action === 'sell') {
+      return `${idx + 1}. [Sell] ${tx.brand} ${tx.model} -${tx.qty} (${tx.branch}) ${dt}`;
+    }
+    if (tx.action === 'return_sale') {
+      return `${idx + 1}. [Return] ${tx.brand} ${tx.model} +${tx.qty} (${tx.branch}) ${dt}`;
+    }
+    if (tx.action === 'transfer') {
+      return `${idx + 1}. [Transfer] ${tx.brand} ${tx.model} x${tx.qty} (${tx.fromBranch} -> ${tx.toBranch}) ${dt}`;
+    }
+    if (tx.action === 'add_model') {
+      return `${idx + 1}. [New Model] ${tx.brand} ${tx.model} (B1:${tx.branch1 || 0}, B2:${tx.branch2 || 0}) ${dt}`;
+    }
+    return `${idx + 1}. [${tx.action}] ${tx.brand || ''} ${tx.model || ''} ${dt}`;
+  }
+
+  function openPendingModal() {
+    const q = state.pendingQueue || [];
+    els.pendingModalCount.textContent = q.length;
+    els.pendingUploadError.classList.add('hidden');
+    if (q.length === 0) {
+      els.pendingQueueList.innerHTML = `<p class="muted">Koi pending entry nahi hai — sab synced hai.</p>`;
+    } else {
+      els.pendingQueueList.innerHTML = q
+        .map((tx, idx) => {
+          const line = formatPendingEntryText(tx, idx);
+          return `<div class="log-item"><div>${escapeHtml(line)}</div></div>`;
+        })
+        .join('');
+    }
+    els.pendingModal.classList.remove('hidden');
+  }
+
+  function reapplyPendingToLocalStock() {
+    const q = state.pendingQueue || [];
+    if (q.length === 0) {
+      showToast('Koi pending entry maujood nahi hai.');
+      return;
+    }
+    let applied = 0;
+    for (const tx of q) {
+      if (tx.action === 'add_model') {
+        const exists = state.stock.find(
+          (x) => x.brand.toLowerCase() === String(tx.brand).toLowerCase() && x.model.toLowerCase() === String(tx.model).toLowerCase()
+        );
+        if (!exists) {
+          state.stock.unshift({
+            id: `${tx.brand}-${tx.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            brand: tx.brand,
+            model: tx.model,
+            branch1: Math.max(0, Number(tx.branch1) || 0),
+            branch2: Math.max(0, Number(tx.branch2) || 0),
+            minAlert: Number(tx.minAlert) || 2,
+            lastUpdated: todayStr(),
+          });
+          applied++;
+        }
+        continue;
+      }
+
+      if (tx.action === 'stock_in' && Array.isArray(tx.items)) {
+        for (const req of tx.items) {
+          const item = state.stock.find(
+            (x) => x.brand.toLowerCase() === String(req.brand).toLowerCase() && x.model.toLowerCase() === String(req.model).toLowerCase()
+          );
+          if (item) {
+            setQty(item, tx.branch, getQty(item, tx.branch) + (Number(req.qty) || 0));
+            applied++;
+          }
+        }
+        continue;
+      }
+
+      const item = state.stock.find(
+        (x) => x.brand.toLowerCase() === String(tx.brand || '').toLowerCase() && x.model.toLowerCase() === String(tx.model || '').toLowerCase()
+      );
+      if (!item) continue;
+
+      if (tx.action === 'adjust_stock') {
+        setQty(item, tx.branch, Math.max(0, Number(tx.newQty) || 0));
+        applied++;
+      } else if (tx.action === 'sell') {
+        setQty(item, tx.branch, Math.max(0, getQty(item, tx.branch) - (Number(tx.qty) || 0)));
+        applied++;
+      } else if (tx.action === 'return_sale') {
+        setQty(item, tx.branch, getQty(item, tx.branch) + (Number(tx.qty) || 0));
+        applied++;
+      } else if (tx.action === 'transfer') {
+        const qty = Number(tx.qty) || 0;
+        setQty(item, tx.fromBranch, Math.max(0, getQty(item, tx.fromBranch) - qty));
+        setQty(item, tx.toBranch, getQty(item, tx.toBranch) + qty);
+        applied++;
+      }
+    }
+    saveState();
+    renderAll();
+    showToast(`${applied} pending changes app stock par wapas apply ho gayin!`);
+  }
+
   function escapeHtml(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -937,7 +1044,8 @@
       'copyOrderListBtn', 'printSheetBtn', 'reportDateInput', 'reportBranchFilter', 'reportSummaryCards', 'reportTabContent', 'printableArea',
       'settingsBranchSelect', 'settingsUserInput', 'settingsLockOtherBranch', 'saveProfileBtn',
       'settingsApiUrlInput', 'saveApiUrlBtn', 'pushSeedBtn', 'pullSyncBtn', 'runBackupBtn', 'apiStatusMessage',
-      'exportCsvBtn', 'exportJsonBtn', 'restoreBackupBtn', 'resetDemoBtn',
+      'exportCsvBtn', 'exportJsonBtn', 'openPendingBtn', 'restoreBackupBtn', 'resetDemoBtn',
+      'pendingModal', 'pendingModalCount', 'closePendingModalBtn', 'reapplyPendingBtn', 'copyPendingBtn', 'flushPendingBtn', 'pendingUploadError', 'pendingQueueList',
       'branchModal', 'modalUserInput', 'closeBranchModalBtn',
       'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty', 'modalB2Qty',
       'closeItemModalBtn', 'modalSellBranch', 'sellQtyMinus', 'sellQtyInput', 'sellQtyPlus', 'sellNoteInput', 'confirmSellBtn',
@@ -1316,6 +1424,35 @@
 
     els.pullSyncBtn.addEventListener('click', syncFromSheet);
     els.syncNowBtn.addEventListener('click', syncFromSheet);
+    els.syncBadge.addEventListener('click', openPendingModal);
+    els.openPendingBtn.addEventListener('click', openPendingModal);
+    els.closePendingModalBtn.addEventListener('click', () => els.pendingModal.classList.add('hidden'));
+    els.reapplyPendingBtn.addEventListener('click', reapplyPendingToLocalStock);
+
+    els.copyPendingBtn.addEventListener('click', async () => {
+      const q = state.pendingQueue || [];
+      if (q.length === 0) return showToast('Pending queue khali hai.');
+      const text = q.map((tx, idx) => formatPendingEntryText(tx, idx)).join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(`${q.length} pending entries copied!`);
+      } catch {
+        showToast('Copy failed — browser permission check karein.');
+      }
+    });
+
+    els.flushPendingBtn.addEventListener('click', async () => {
+      if (!state.apiUrl) return showToast('Pehle Settings mein Apps Script URL save karein.');
+      els.pendingUploadError.classList.add('hidden');
+      const res = await flushQueue();
+      openPendingModal();
+      if (res.ok) {
+        showToast('Saari pending entries Google Sheet par upload ho gayin!');
+      } else {
+        els.pendingUploadError.textContent = `Upload ruka (${res.remainingCount} baqi): ${res.lastError}`;
+        els.pendingUploadError.classList.remove('hidden');
+      }
+    });
 
     els.runBackupBtn.addEventListener('click', async () => {
       if (!state.apiUrl) return showToast('Pehle Apps Script URL save karein.');

@@ -25,7 +25,7 @@
         </div>
       </div>
       <div class="topbar-right">
-        <span id="syncBadge" class="sync-badge local">Local</span>
+        <button id="syncBadge" class="sync-badge local" type="button" title="View Pending Queue">Local</button>
         <button id="syncNowBtn" class="icon-btn" type="button" title="Sync with Google Sheets">&#8635;</button>
       </div>
     </header>
@@ -218,6 +218,7 @@
           <div class="btn-grid mt-8">
             <button id="exportCsvBtn" class="btn btn-outline" type="button">Download Stock CSV</button>
             <button id="exportJsonBtn" class="btn btn-outline" type="button">Download Full Backup JSON</button>
+            <button id="openPendingBtn" class="btn btn-outline" type="button">View Pending Queue</button>
             <button id="restoreBackupBtn" class="btn btn-outline" type="button">Restore Pre-Sync Backup</button>
             <button id="resetDemoBtn" class="btn btn-danger-outline" type="button">Reset Local Demo Data</button>
           </div>
@@ -403,6 +404,28 @@
         </label>
       </div>
       <button id="confirmAddModelBtn" class="btn btn-primary btn-block mt-12" type="button">Add Model</button>
+    </div>
+  </div>
+
+  <!-- Pending Queue Viewer & Recovery Modal -->
+  <div id="pendingModal" class="modal-backdrop hidden no-print">
+    <div class="modal-card modal-tall">
+      <div class="panel-header-row">
+        <div>
+          <h2>Pending Queue (<span id="pendingModalCount">0</span>)</h2>
+          <p class="muted">Yeh woh changes hain jo abhi Sheet par upload nahi ho sakin</p>
+        </div>
+        <button id="closePendingModalBtn" class="icon-btn" type="button">&times;</button>
+      </div>
+
+      <div class="btn-grid mt-12">
+        <button id="reapplyPendingBtn" class="btn btn-primary btn-sm" type="button">Re-Apply to App Stock</button>
+        <button id="copyPendingBtn" class="btn btn-outline btn-sm" type="button">Copy All Pending</button>
+      </div>
+      <button id="flushPendingBtn" class="btn btn-amber btn-sm btn-block mt-8" type="button">Try Upload to Google Sheet</button>
+      <div id="pendingUploadError" class="status-box err mt-8 hidden"></div>
+
+      <div id="pendingQueueList" class="pending-scroll-list mt-12"></div>
     </div>
   </div>
 
