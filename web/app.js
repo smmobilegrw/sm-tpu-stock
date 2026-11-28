@@ -1064,7 +1064,7 @@
       'copyOrderListBtn', 'printSheetBtn', 'reportDateInput', 'reportBranchFilter', 'reportSummaryCards', 'reportTabContent', 'printableArea',
       'settingsBranchSelect', 'settingsUserInput', 'settingsLockOtherBranch', 'saveProfileBtn',
       'settingsApiUrlInput', 'saveApiUrlBtn', 'pushSeedBtn', 'pullSyncBtn', 'runBackupBtn', 'apiStatusMessage',
-      'exportCsvBtn', 'exportJsonBtn', 'openPendingBtn', 'restoreBackupBtn', 'resetDemoBtn',
+      'exportCsvBtn', 'exportJsonBtn', 'importJsonBtn', 'importJsonInput', 'openPendingBtn', 'restoreBackupBtn', 'resetDemoBtn',
       'pendingModal', 'pendingModalCount', 'closePendingModalBtn', 'reapplyPendingBtn', 'copyPendingBtn', 'flushPendingBtn', 'pendingUploadError', 'pendingQueueList',
       'branchModal', 'modalUserInput', 'closeBranchModalBtn',
       'itemActionModal', 'modalBrandBadge', 'modalModelTitle', 'modalB1Qty', 'modalB2Qty',
@@ -1501,6 +1501,32 @@
 
     els.exportJsonBtn.addEventListener('click', () => {
       downloadFile(`sm-tpu-backup-${todayStr()}.json`, JSON.stringify(state, null, 2), 'application/json');
+    });
+
+    els.importJsonBtn.addEventListener('click', () => els.importJsonInput.click());
+    els.importJsonInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed.stock) || parsed.stock.length === 0) {
+          showToast('Invalid backup file — stock list nahi mili.');
+          return;
+        }
+        if (!confirm(`${parsed.stock.length} models wali backup file load karni hai?`)) return;
+        state = {
+          ...buildInitialState(),
+          ...parsed,
+          stock: repairCorruptedModels(parsed.stock),
+        };
+        saveState();
+        renderAll();
+        showToast(`Backup imported (${state.stock.length} models). Ab Settings se Push Stock to Sheet dabayein.`);
+      } catch (err) {
+        showToast('JSON import error: ' + err.message);
+      }
     });
 
     els.restoreBackupBtn.addEventListener('click', () => {
